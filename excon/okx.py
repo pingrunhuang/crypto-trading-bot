@@ -103,7 +103,9 @@ class OKEXSocket(websocket.WebSocketApp):
         pair: str = None, 
         url: str = None, 
         start_price: float = None,
-        threshold: float = None) -> None:
+        threshold: float = None,
+        proxy_host: str = None,
+        proxy_port: str = None) -> None:
 
         self.url = url if url else "wss://real.okex.com:8443/ws/v3"
         self.channels = f"spot/trade:{pair}" if pair else "spot/trade:BTC-USDC"
@@ -113,6 +115,8 @@ class OKEXSocket(websocket.WebSocketApp):
         self.batch_size = 10
         self.use_batch = False
         self.threshold = threshold if threshold else 0.1
+        self.proxy_host = proxy_host
+        self.proxy_port = proxy_port
         super().__init__(
             self.url, 
             on_open=self.on_open, 
@@ -178,6 +182,12 @@ class OKEXSocket(websocket.WebSocketApp):
             logger.info(f"Buy {self.base_qty} at price {cur_price}: {cur_price-self.start_price}")
             self.orders.append({"qty": self.base_qty, "ntl": self.base_qty*(cur_price - self.start_price), "price": cur_price})
             self.start_price = cur_price
+    
+    def run_forever(self):
+        if self.proxy_port and self.proxy_host:
+            super().run_forever(http_proxy_host=self.proxy_host, http_proxy_port=self.proxy_port)
+        else:
+            super().run_forever()
 
     def start(self):
         while True:
@@ -212,9 +222,12 @@ def test2():
     import yaml
     with open("configs/grid_trading_params.yaml") as f:
         params = yaml.safe_load(f)["okex"]
+    start_prx = params.get("initial_price")
     ws = OKEXSocket(pair=params["pair"], 
-                    start_price=float(params["initial_price"]), 
-                    threshold=float(params["pct_threshold"]))
+                    start_price=float(start_prx) if start_prx else None, 
+                    threshold=float(params["pct_threshold"]),
+                    proxy_host=params["proxy_host"],
+                    proxy_port=params["proxy_port"])
     ws.start()
 
 
