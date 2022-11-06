@@ -2,7 +2,6 @@ from sys import flags
 from time import time
 from typing import Callable
 import requests
-from loguru import logger
 import datetime
 import base64
 import hashlib
@@ -10,13 +9,15 @@ import hmac
 import ccxt
 import json
 from decimal import Decimal
-import math
 import zlib
 import websocket
 from websocket import create_connection, send, recv
+import yaml
 import _thread as thread
-import pandas as pd
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 logger.add("app.log")
 
@@ -219,7 +220,6 @@ def test1():
 
 
 def test2():
-    import yaml
     with open("configs/grid_trading_params.yaml") as f:
         params = yaml.safe_load(f)["okex"]
     start_prx = params.get("initial_price")
