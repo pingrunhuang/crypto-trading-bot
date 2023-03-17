@@ -22,4 +22,6 @@ build-backend = "pdm.pep517.api"
 [tool.pdm]
 
 [tool.pdm.scripts]
-em = "eastmoney.py"
+em-trades = "eastmoney/trades2mongo.py"
+em-funds = "eastmoney/funds2mongo.py"
+em-funds-calc = "em_calc.py"
