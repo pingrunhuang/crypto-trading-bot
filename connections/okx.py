@@ -1,6 +1,4 @@
-from sys import flags
 from time import time
-from typing import Callable
 import requests
 import datetime
 import base64
@@ -10,6 +8,7 @@ import ccxt
 import json
 from decimal import Decimal
 import zlib
+from requests.api import head
 import websocket
 from websocket import create_connection, send, recv
 import yaml
@@ -31,58 +30,69 @@ def inflate(data):
 
 
 class OKEXBot:
-    ENDPOINT = 'https://www.okexcn.com'
-    # ENDPOINT = 'https://www.okex.com'
+    ENDPOINT = 'https://www.okex.com'
 
-    def __init__(self, key: str, secret: str, phrase: str):
-        self.key = key
-        self.secret = secret
-        self.phrase = phrase
-        self.cli = ccxt.okex(config={"apiKey": key, "secret": secret, "password": phrase, "hostname": "okexcn.com"})
+    def __init__(self, confidentials: dict, settings:dict):
+        self.confidentials = confidentials
+        self.step_size = float(settings["amt_threshold"]) if settings.get("amt_threshold") else 0
+        self.pair = settings["pair"] if settings.get("pair") else ""
+        self.base_qty = float(settings["base_qty"]) if settings.get("base_qty") else 0
+        self.cur_prx = float(settings["initial_price"]) if settings.get("initial_price") else self.get_latest_price(self.pair)
+        self.side = None
 
-    def batch_order(self):
-        url = f'{self.ENDPOINT}/api/spot/v3/batch_orders'
-
-    def order(self,
-              symbol: str,
+    def place_order(self,
               side: str,
+              price: str,
               oid: str = None,
               _type: str = "limit",
-              price: str = None,
-              ntl: str = None,
               size: str = None):
-        path = "/api/spot/v3/orders"
+        path = "/api/v5/trade/order"
         url = self.ENDPOINT + path
-        params = {"type": _type, "side": side, "instrument_id": symbol}
+        sym_base, sym_quote = self.pair.split('-')
+        params = {"ordType": _type, "side": side, "instId": self.pair, "sz": size, "px": price}
+        params["tdMode"] = "cash" # only spot now
+        params["posSide"] = "net"
+        params["tgtCcy"] = sym_quote
         if oid:
-            params["client_oid"] = oid
-        if _type == 'limit' and price is not None and size is not None:
-            params["price"] = price
-            params["size"] = size
-        elif _type == 'market' and side == 'sell' and size:
-            params["size"] = size
-        elif _type == 'market' and side == 'buy' and ntl:
-            params["notional"] = ntl
-        else:
-            raise ValueError(f"Please check type={_type}, size={size}, price={price}, notional={ntl}")
+            params["clOrdId"] = oid
+
         logger.debug(f"Params={params}")
-        sign = self.cli.sign("orders", method="POST", params=params, api="spot")
-        res = requests.post(sign["url"], data=sign["body"], headers=sign["headers"])
+        header = generate_header(self.confidentials, path, params, "POST", False)
+        logger.info(f"Header: {header}")
+        res = requests.post(url, json=params, headers=header)
+        msg = res.json()
+        if msg["code"] != '0':
+            raise Exception(msg["message"])
+        else:
+            logger.info(msg)
+            order_id = oid if oid else msg["data"][0]["ordId"]
+
+            return True
+
+    def get_balance(self):
+        endpoint = "/api/v5/account/balance"
+        url = self.ENDPOINT + endpoint
+        header = generate_header(self.confidentials, endpoint, method="GET", is_simulated=False)
+        logger.info(f"Header: {header}")
+        res = requests.get(url, headers=header)
         msg = res.json()
         if msg["code"] == '33017':
             logger.error(msg["message"])
-            return False
+            return pd.DataFrame()
         else:
-            logger.info(msg)
-            return True
+            data = pd.DataFrame(data=msg["data"][0]["details"])
+            logger.debug(f"Balance: {data}")
+            return data
 
-    def get_latest_price(self, symbol) -> float:
-        url = f'{self.ENDPOINT}/api/spot/v3/instruments/{symbol}/ticker'
+
+    def get_latest_price(self, symbol: str) -> float:
+        url = f'{self.ENDPOINT}/api/v5/market/ticker/?instId={symbol}'
         res = requests.get(url)
         if res.ok:
-            data = res.json()
+            data = res.json()["data"]
             logger.debug(f'Latest tick of {symbol}: {data}')
-            return float(data["last"])
+            latest_data = data[0]
+            return float(latest_data["last"])
         else:
             logger.error(f"Error: {res.content}")
             return -1
@@ -95,6 +105,29 @@ class OKEXBot:
             return size_increment
         # precition = str(size_increment) - 2 if size_increment < 0 else 0
         return multiplier*size_increment
+    
+    def start_grid_trading(self):
+        logger.info(f"Start trading {self.pair} with price {self.cur_prx}")
+        while True:
+            cur_prx = self.get_latest_price(self.pair)
+            prx_diff = cur_prx - self.cur_prx
+            logger.info(f"Last filled price: {self.cur_prx} | Current price: {cur_prx} | Price diff: {prx_diff}")
+            base, quote = self.pair.split("-")
+            if prx_diff > self.step_size:
+                quote_qty = self.base_qty * prx_diff
+                self.cur_prx = cur_prx
+                logger.info(f"Sell {self.base_qty} {base} at price {cur_prx}: +{quote_qty} {quote}")
+                order = self.place_order(self.pair, "sell", str(cur_prx))
+
+
+            elif prx_diff < -self.step_size:
+                quote_qty = self.base_qty * prx_diff
+                self.cur_prx = cur_prx
+                logger.info(f"Buy {self.base_qty} {base} at price {cur_prx}: -{quote_qty} {quote}")
+                order = self.place_order(self.pair, "buy", str(cur_prx))
+                
+
+            time.sleep(5)
 
 
 class OKEXSocket(websocket.WebSocketApp):
@@ -103,19 +136,26 @@ class OKEXSocket(websocket.WebSocketApp):
         self, 
         pair: str = None, 
         url: str = None, 
-        start_price: float = None,
+        cur_prx: float = None,
+        base_qty: float = 0,
+        quote_qty: float = 0,
         threshold: float = None,
         proxy_host: str = None,
-        proxy_port: str = None) -> None:
+        proxy_port: str = None,
+        step_size: float = None) -> None:
 
-        self.url = url if url else "wss://real.okex.com:8443/ws/v3"
-        self.channels = f"spot/trade:{pair}" if pair else "spot/trade:BTC-USDC"
-        self.start_price = start_price
-        self.base_qty = 0.004
+        self.url = url if url else "wss://ws.okex.com:8443/ws/v5/public"
+        self.pair = pair if pair else "BTC-USDC"
+        self.channels = f"spot/trade:{self.pair}" 
+
+        self.cur_prx = cur_prx
+        self.base_qty = base_qty
+        self.quote_qty = quote_qty
         self.orders = []
         self.batch_size = 10
         self.use_batch = False
         self.threshold = threshold if threshold else 0.1
+        self.step_size = step_size if step_size else 1000
         self.proxy_host = proxy_host
         self.proxy_port = proxy_port
         super().__init__(
@@ -132,7 +172,7 @@ class OKEXSocket(websocket.WebSocketApp):
         msg = inflate(msg)
         logger.info(f"{self.url}: {msg}")
         data = json.loads(msg)["data"]
-        self.order(data)
+        self.step_chg_sty(data)
         self.save()
 
     def save(self):
@@ -169,21 +209,39 @@ class OKEXSocket(websocket.WebSocketApp):
         logger.debug(f"Sending {str_params}")
         self.send(str_params)
 
-    def order(self, data: dict):
+    def pct_chg_sty(self, data: dict):
         cur_price = float(data[0]["price"])
-        if not self.start_price:
-            self.start_price = cur_price
-        logger.info(f"Start price: {self.start_price} | Current price: {cur_price}")
-        diff_pct = (cur_price - self.start_price)/self.start_price
+        if not self.cur_prx:
+            self.cur_prx = cur_price
+        logger.info(f"Last filled price: {self.cur_prx} | Current price: {cur_price}")
+        diff_pct = (cur_price - self.cur_prx)/self.cur_prx
         if diff_pct > self.threshold:
-            logger.info(f"Sell {self.base_qty} at price {cur_price}: {cur_price-self.start_price}")
-            self.orders.append({"qty": self.base_qty, "ntl": self.base_qty*(cur_price - self.start_price), "price": cur_price})
-            self.start_price = cur_price
+            logger.info(f"Sell {self.base_qty} at price {cur_price}: {cur_price-self.cur_prx}")
+            self.orders.append({"qty": self.base_qty, "ntl": self.base_qty*(cur_price - self.cur_prx), "price": cur_price})
+            self.cur_prx = cur_price
         elif diff_pct < -self.threshold:
-            logger.info(f"Buy {self.base_qty} at price {cur_price}: {cur_price-self.start_price}")
-            self.orders.append({"qty": self.base_qty, "ntl": self.base_qty*(cur_price - self.start_price), "price": cur_price})
-            self.start_price = cur_price
+            logger.info(f"Buy {self.base_qty} at price {cur_price}: {cur_price-self.cur_prx}")
+            self.orders.append({"qty": self.base_qty, "ntl": self.base_qty*(cur_price - self.cur_prx), "price": cur_price})
+            self.cur_prx = cur_price
     
+    def step_chg_sty(self, data: dict):
+        cur_price = float(data[0]["price"])
+        if not self.cur_prx:
+            self.cur_prx = cur_price
+        logger.info(f"Last filled price: {self.cur_prx} | Current price: {cur_price}")
+        base, quote = self.pair.split("-")
+        prx_diff = cur_price - self.cur_prx
+        if prx_diff > self.step_size:
+            quote_qty = self.base_qty * prx_diff
+            logger.info(f"Sell {self.base_qty} {base} at price {cur_price}: +{quote_qty} {quote}")
+            self.orders.append({"qty": self.base_qty, "quote_qty": quote_qty, "price": cur_price})
+            self.cur_prx = cur_price
+        elif prx_diff < -self.step_size:
+            quote_qty = self.base_qty * prx_diff
+            logger.info(f"Buy {self.base_qty} {base} at price {cur_price}: -{quote_qty} {quote}")
+            self.orders.append({"qty": self.base_qty, "quote_qty": quote_qty, "price": cur_price})
+            self.cur_prx = cur_price
+
     def run_forever(self):
         if self.proxy_port and self.proxy_host:
             super().run_forever(http_proxy_host=self.proxy_host, http_proxy_port=self.proxy_port)
@@ -197,8 +255,9 @@ class OKEXSocket(websocket.WebSocketApp):
             except KeyboardInterrupt:
                 break
 
+
+
 def test1():
-    import yaml
     with open("configs/settings.yaml") as f:
         setting = yaml.load(f)
     bot = OKEXBot(setting["key"], setting["secret"], setting["passwd"])
@@ -223,13 +282,11 @@ def test2():
     with open("configs/grid_trading_params.yaml") as f:
         params = yaml.safe_load(f)["okex"]
     start_prx = params.get("initial_price")
+    proxy_host = params.get("proxy_host")
+    proxy_port = params.get("proxy_port")
     ws = OKEXSocket(pair=params["pair"], 
-                    start_price=float(start_prx) if start_prx else None, 
+                    cur_prx=float(start_prx) if start_prx else None, 
                     threshold=float(params["pct_threshold"]),
-                    proxy_host=params["proxy_host"],
-                    proxy_port=params["proxy_port"])
+                    proxy_host=proxy_host,
+                    proxy_port=proxy_port)
     ws.start()
-
-
-if __name__ == '__main__':
-    test2()

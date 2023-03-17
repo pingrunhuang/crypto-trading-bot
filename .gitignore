@@ -1,2 +1,5 @@
 ./configs
 ./app.log
+./confidential.json
+__pypackages__
+__pycache__
