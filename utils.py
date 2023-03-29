@@ -4,8 +4,7 @@ import hashlib
 import hmac
 import base64
 from bson.decimal128 import Decimal128
-from decimal import Decimal
-import time
+from typing import Any
 
 
 def safe_decimal128(x):
@@ -65,7 +64,7 @@ def ok_hmac(request, secret, algorithm=hashlib.sha256, digest='hex'):
         return base64.standard_b64encode(binary)
     return binary
 
-def sign(timestamp:str, method:str, endpoint:str, secret:str, params:dict=None):
+def sign(timestamp:str, method:str, endpoint:str, secret:str, params:Any[str, None]):
     method = str.upper(method)
     if method != 'POST' or not params:
         str_params = ''

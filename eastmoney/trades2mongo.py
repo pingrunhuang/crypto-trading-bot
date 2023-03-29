@@ -1,13 +1,13 @@
 import logging
 import pandas as pd
-from mongo_utils import MongoManger
+from eastmoney.mongo_utils import MongoManger
 import json
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s|%(levelname)s|%(message)s")
 
 logger = logging.getLogger(__name__)
 
-def trades2mongo(historical_json:str):
+def trades2mongo(historical_json:str, db_name:str="fund"):
     
     with open(historical_json, encoding="utf-8") as fp:
         historical = json.load(fp)
@@ -38,9 +38,9 @@ def trades2mongo(historical_json:str):
     logger.info(f"Origianl number of trades: {len(df)}")
     data = df[columns].drop_duplicates()
     logger.info(f"Unique number of trades: {len(data)}")
-    mgo_manager = MongoManger()
-    clc = mgo_manager.get_database().get_collection("em_trades")
-    clc.insert_many(data.to_dict("records"))
+    mgo_manager = MongoManger(db_name)
+    mgo_manager.batch_upsert(data.to_dict("records"), "em_trades", "trade_id")
+
 
 if __name__=="__main__":
     

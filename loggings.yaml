@@ -1,0 +1,30 @@
+version: 1
+formatters:
+    default:
+        format: "%(asctime)s|%(levelname)s|%(message)s"
+    error:
+        format: "%(levelname)s|<PID %(process)d:%(processName)s>|%(name)s.%(funcName)s(): %(message)s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: default
+    level: DEBUG
+  file:
+    class: logging.handlers.RotatingFileHandler
+    formatter: default
+    level: DEBUG
+    filename: app.log
+    maxBytes: 10240
+    backupCount: 5
+  error:
+    class: logging.handlers.RotatingFileHandler
+    formatter: error
+    level: ERROR
+    filename: error.log
+    maxBytes: 1024
+    backupCount: 10
+
+loggers:
+  dev:
+    handlers: [console, error]
