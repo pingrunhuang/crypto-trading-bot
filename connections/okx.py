@@ -10,15 +10,16 @@ from decimal import Decimal
 import zlib
 from requests.api import head
 import websocket
-from websocket import create_connection, send, recv
 import yaml
 import _thread as thread
 import time
 import logging
+from typing import Optional
+import pandas as pd
+from utils import sign
+
 
 logger = logging.getLogger(__name__)
-
-logger.add("app.log")
 
 
 def inflate(data):
@@ -47,9 +48,9 @@ class OKEXBot:
     def place_order(self,
                     side: str,
                     price: str,
-                    oid: str = None,
+                    oid: str = "",
                     _type: str = "limit",
-                    size: str = None):
+                    size: str = ""):
         path = "/api/v5/trade/order"
         url = self.ENDPOINT + path
         sym_base, sym_quote = self.pair.split('-')
@@ -62,7 +63,7 @@ class OKEXBot:
             params["clOrdId"] = oid
 
         logger.debug(f"Params={params}")
-        header = generate_header(
+        header = self.generate_header(
             self.confidentials, path, params, "POST", False)
         logger.info(f"Header: {header}")
         res = requests.post(url, json=params, headers=header)
@@ -78,8 +79,13 @@ class OKEXBot:
     def get_balance(self):
         endpoint = "/api/v5/account/balance"
         url = self.ENDPOINT + endpoint
-        header = generate_header(
-            self.confidentials, endpoint, method="GET", is_simulated=False)
+        header = self.generate_header(
+            self.confidentials, 
+            endpoint, 
+            method="GET", 
+            is_simulated=False,
+            body=None
+        )
         logger.info(f"Header: {header}")
         res = requests.get(url, headers=header)
         msg = res.json()
@@ -136,13 +142,42 @@ class OKEXBot:
 
             time.sleep(5)
 
+    def grab_balance(self, config: dict):
+        request_path = "/api/v5/account/balance"
+        url = "https://www.okex.com"
+        url += request_path
+        header = self.generate_header(config, request_path, "", is_simulated=False)
+        res = requests.get(url, headers=header)
+        logger.info(res.json())
+        # cli = ccxt.okex(config={"apiKey": key, "secret": secret, "password": phrase, "hostname": "okexcn.com"})
 
-class OKEXSocket(websocket.WebSocketApp):
+    def generate_header(self, 
+                        info: dict, 
+                        requestPath: str, 
+                        body: Optional[dict], 
+                        method: str="GET", 
+                        is_simulated:bool=True) -> dict:
+        utc_now = datetime.datetime.utcnow()
+        timestamp = str(utc_now.isoformat("T", "milliseconds") + "Z")
+
+        signature = sign(timestamp, method, requestPath, info['secretkey'], body)
+        header = {
+            'Content-Type': 'application/json',
+            'OK-ACCESS-KEY': info['apikey'],
+            'OK-ACCESS-SIGN': signature,
+            'OK-ACCESS-PASSPHRASE': info['passwd'],
+            "OK-ACCESS-TIMESTAMP": timestamp
+        }
+        if is_simulated:
+            header['x-simulated-trading'] = '1'
+        return header
+
+class OKEXSocket(websocket.WebSocket):
 
     def __init__(
             self,
-            pair: str = None,
-            url: str = None,
+            pair: str = "",
+            url: str = "",
             cur_prx: float = None,
             base_qty: float = 0,
             quote_qty: float = 0,
@@ -275,8 +310,8 @@ class OKEXSocket(websocket.WebSocketApp):
 
 def test1():
     with open("configs/settings.yaml") as f:
-        setting = yaml.load(f)
-    bot = OKEXBot(setting["key"], setting["secret"], setting["passwd"])
+        setting = yaml.safe_load(f)
+        bot = OKEXBot(setting["key"], setting["secret"], setting["passwd"])
     buy_prices = [53250, 53000, 52500]
     sell_prices = [56500, 57000, 57500]
     qty = 0.004
@@ -299,7 +334,7 @@ def test1():
 def test2():
     with open("configs/grid_trading_params.yaml") as f:
         params = yaml.safe_load(f)["okex"]
-    start_prx = params.get("initial_price")
+        start_prx = params.get("initial_price")
     proxy_host = params.get("proxy_host")
     proxy_port = params.get("proxy_port")
     ws = OKEXSocket(pair=params["pair"],

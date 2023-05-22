@@ -3,16 +3,18 @@ name = ""
 version = ""
 description = ""
 authors = [
-    {name = "frank", email = "pingrunhuang@gmail.com"},
+    {name = "pingrunhuang", email = "pingrunhuang@gmail.com"},
 ]
 dependencies = [
-    "pymongo>=4.3.3",
-    "pandas>=1.5.3",
+    "pandas>=2.0.1",
+    "requests>=2.30.0",
     "pyyaml>=6.0",
-    "ccxt>=3.0.16",
-    "websocket>=0.2.1",
+    "pymongo>=4.3.3",
+    "ccxt>=3.0.100",
+    "websockets>=11.0.3",
+    "click>=8.1.3",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 
 [build-system]
@@ -25,4 +27,4 @@ build-backend = "pdm.pep517.api"
 em-trades = "eastmoney/trades2mongo.py"
 em-funds = "eastmoney/funds2mongo.py"
 em-funds-calc = "em_calc.py"
-test = "tests/main.py"
+bnc = "main.py "

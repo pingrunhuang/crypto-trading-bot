@@ -1,5 +1,6 @@
-./configs
+./configs/*
 ./app.log
 ./confidential.json
 __pypackages__
-__pycache__
+__pycache__/.pdm-python
+.vscode

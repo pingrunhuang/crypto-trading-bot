@@ -1,10 +1,7 @@
 import logging
 import pandas as pd
-from eastmoney.mongo_utils import MongoManger
+from mongo_utils import MongoManger
 import json
-
-logging.basicConfig(level=logging.DEBUG,
-                    format="%(asctime)s|%(levelname)s|%(message)s")
 
 
 logger = logging.getLogger(__name__)

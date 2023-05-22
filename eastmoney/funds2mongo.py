@@ -4,7 +4,7 @@ import json
 import logging
 import datetime
 
-logger = logging.getLogger("dev")
+logger = logging.getLogger(__name__)
 
 
 def funds2mongo(funds_json: str, db_name: str = "fund"):

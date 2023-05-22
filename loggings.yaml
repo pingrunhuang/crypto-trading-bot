@@ -1,9 +1,9 @@
 version: 1
 formatters:
-    default:
-        format: "%(asctime)s|%(levelname)s|%(message)s"
-    error:
-        format: "%(levelname)s|<PID %(process)d:%(processName)s>|%(name)s.%(funcName)s(): %(message)s"
+  default:
+      format: "%(asctime)s|%(levelname)s|%(message)s"
+  error:
+      format: "%(levelname)s|<PID %(process)d:%(processName)s>|%(name)s.%(funcName)s(): %(message)s"
 
 handlers:
   console:
@@ -26,5 +26,13 @@ handlers:
     backupCount: 10
 
 loggers:
-  dev:
+  connections:
+    handlers: [console, file, error]
+    # even handlers already setup levels, this level is important to setup for logger level 
+    level: DEBUG
+  eastmoney:
+    handlers: [console, file, error]
+    level: DEBUG
+  main:
     handlers: [console, error]
+    level: INFO

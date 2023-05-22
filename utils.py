@@ -13,23 +13,6 @@ def safe_decimal128(x):
     if isinstance(x, float):
         return Decimal128(str(x))
 
-
-def generate_header(info: dict, requestPath: str, body: dict=None, method: str="GET", is_simulated:bool=True) -> dict:
-    utc_now = datetime.datetime.utcnow()
-    timestamp = str(utc_now.isoformat("T", "milliseconds") + "Z")
-
-    signature = sign(timestamp, method, requestPath, info['secretkey'], body)
-    header = {
-        'Content-Type': 'application/json',
-        'OK-ACCESS-KEY': info['apikey'],
-        'OK-ACCESS-SIGN': signature,
-        'OK-ACCESS-PASSPHRASE': info['passwd'],
-        "OK-ACCESS-TIMESTAMP": timestamp
-    }
-    if is_simulated:
-        header['x-simulated-trading'] = '1'
-    return header
-
 def decode(string):
     return string.decode('latin-1')
 

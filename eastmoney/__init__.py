@@ -1,12 +1,8 @@
 import logging
 import pandas as pd
-from eastmoney.mongo_utils import MongoManger
-
-logging.basicConfig(level=logging.DEBUG,
-                    format="%(asctime)s|%(levelname)s|%(message)s")
+from mongo_utils import MongoManger
 
 logger = logging.getLogger(__name__)
-
 
 def calc_total_position(data: list):
     total_buy = 0
@@ -37,8 +33,8 @@ def calc_pnl(data: dict, assets_ntl: float):
 
 
 def calc_funding():
-    manager = MongoManger()
-    clc = manager.get_database().get_collection("account_balance")
+    manager = MongoManger("fund")
+    clc = manager.db.get_collection("account_balance")
     res = clc.find({}, sort=[("datetime", -1)])
     df = pd.DataFrame(res)
     logger.info(f"Funding df: {df.head()}")
@@ -46,7 +42,3 @@ def calc_funding():
     logger.info(f"Total withdraw: {abs(withdraw_df['funding_cny'].sum())}")
     deposite_df = df[(df['funding_cny'] > 0) & (df['status'] == "交易成功")]
     logger.info(f"Total deposite: {deposite_df['funding_cny'].sum()}")
-
-
-if __name__ == "__main__":
-    calc_funding()
