@@ -4,8 +4,14 @@ import hashlib
 import hmac
 import base64
 from bson.decimal128 import Decimal128
-from typing import Any
+from typing import Optional, Union
+from contextlib import contextmanager
+import os
+import logging
+import zipfile
+from io import BytesIO
 
+logger = logging.getLogger(__name__)
 
 def safe_decimal128(x):
     if isinstance(x, str):
@@ -47,7 +53,7 @@ def ok_hmac(request, secret, algorithm=hashlib.sha256, digest='hex'):
         return base64.standard_b64encode(binary)
     return binary
 
-def sign(timestamp:str, method:str, endpoint:str, secret:str, params:Any[str, None]):
+def sign(timestamp:str, method:str, endpoint:str, secret:str, params:Optional[str]):
     method = str.upper(method)
     if method != 'POST' or not params:
         str_params = ''
@@ -61,3 +67,13 @@ def sign(timestamp:str, method:str, endpoint:str, secret:str, params:Any[str, No
     binary = mac.digest()
     sign = base64.b64encode(binary)
     return sign
+
+
+def unzip(filename:str, content:Union[str, BytesIO, bytes]):
+    logger.info(f"Extracting zipfile from: {filename}")
+    if isinstance(content, bytes):
+        content = BytesIO(content)
+    elif isinstance(content, str):
+        content = BytesIO(content.encode("utf-8"))
+    z = zipfile.ZipFile(content)
+    z.extractall(filename)

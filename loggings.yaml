@@ -15,7 +15,7 @@ handlers:
     formatter: default
     level: DEBUG
     filename: app.log
-    maxBytes: 10240
+    maxBytes: 10240000
     backupCount: 5
   error:
     class: logging.handlers.RotatingFileHandler

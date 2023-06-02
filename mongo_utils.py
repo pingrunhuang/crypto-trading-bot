@@ -8,7 +8,7 @@ logger = logging.getLogger("dev")
 
 
 class MongoManger:    
-    setting_path = "configs/settings.yaml"
+    setting_path = "./credentials.yaml"
 
     def __init__(self, db_name: Optional[str]) -> None:
         with open(self.setting_path) as f:
@@ -35,9 +35,9 @@ class MongoManger:
             logger.error(msg)
             raise ValueError(msg)
 
-    def batch_upsert(self, data: list, clc: str, key: str = "_id"):
+    def batch_upsert(self, data: list, clc: str, keys: list[str] = ["_id"]):
         to_update = [
-            UpdateOne({key: x[key]}, {"$set": x}, upsert=True) for x in data
+            UpdateOne({k: x[k] for k in keys}, {"$set": x}, upsert=True) for x in data
         ]
         if self.db is not None:
             result = self.db.get_collection(clc).bulk_write(to_update)

@@ -1,4 +1,4 @@
-./app.log
+app.log
 __pypackages__
 __pycache__/.pdm-python
 .vscode
