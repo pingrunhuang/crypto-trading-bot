@@ -5,25 +5,24 @@ from datetime import datetime
 import requests
 from io import BytesIO
 import logging
-from mongo_utils import MongoManger
+from mongo_utils import MongoManger, AsyncMongoManager
 import shutil
 import os
 from utils import unzip
 from contextlib import contextmanager
-from consts import DT, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, EXCH, \
+from consts import DATETIME, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, EXCH, \
     BINANCE, BUY_SELL, AT, OPEN, HIGH, LOW, CLOSE, TICK, LOT
-from connections.base import ABCConnection
+from connections.base import ABCConnection, ABCDownloader
 
 logger = logging.getLogger(__name__)
 
-
-class BNCDownloader:
+class BNCDownloader(ABCDownloader):
     """
     binance historical data downloader
     """
     API_URL = "https://data.binance.vision/data"
     def __init__(self, db_name:str="history") -> None:
-        self.db_manager = MongoManger(db_name)
+        super().__init__(db_name)
     
     @contextmanager
     def download_zip(self, endpoint:str, filename:str):
@@ -39,7 +38,10 @@ class BNCDownloader:
         yield
         shutil.rmtree(filename)
 
-    def store_spot_trades(self, sym_base:str, sym_quote:str, dt:Optional[datetime]=None):
+    def fetch_spot_trades(self, 
+                          sym_base:str, 
+                          sym_quote:str, 
+                          dt:Optional[datetime])->pd.DataFrame:
         if not dt:
             dt = datetime.utcnow()
         sym_root = f"{sym_base.upper()}{sym_quote.upper()}"
@@ -52,7 +54,7 @@ class BNCDownloader:
                 names=["trade_id", "price", "qty", "quo_qty", "datetime", "isBuyerMaker", "isMatch"]
             )
             df[BUY_SELL] = np.where(df["isBuyerMaker"], "sell", "buy")
-            df[DT] = pd.to_datetime(df["datetime"], unit="ms")
+            df[DATETIME] = pd.to_datetime(df["datetime"], unit="ms")
             df[SYM] = f"{sym_base}{sym_quote}.BNC"
             df[SYM_BASE] = sym_base
             df[SYM_QUOTE] = sym_quote
@@ -61,9 +63,13 @@ class BNCDownloader:
             df[SYM_ROOT] = sym_root
             df.drop(["isBuyerMaker", "isMatch"], axis=1, inplace=True)
             logger.debug(df.head())
-            self.db_manager.batch_upsert(df.to_dict("records"), "trades", ["trade_id"])
+            return df
     
-    def store_spot_klines(self, sym_base:str, sym_quote:str, freq:str, dt:Optional[datetime]=None):
+    def fetch_spot_klines(self, 
+                          sym_base:str, 
+                          sym_quote:str, 
+                          freq:str, 
+                          dt:Optional[datetime])->pd.DataFrame:
         if not dt:
             dt = datetime.utcnow()
         sym_root = f"{sym_base.upper()}{sym_quote.upper()}"
@@ -76,7 +82,7 @@ class BNCDownloader:
                 names=["datetime", "open", "high", "low", "close", "volume", "close_dt", "quote_volume", "no_trades", "taker_buy_base", "taker_buy_quote", "/"]
             )
             logger.info(df.head())
-            df[DT] = pd.to_datetime(df["datetime"], unit="ms")
+            df[DATETIME] = pd.to_datetime(df["datetime"], unit="ms")
             df[SYM] = f"{sym_base}{sym_quote}.{BINANCE}"
             df[SYM_BASE] = sym_base
             df[SYM_QUOTE] = sym_quote
@@ -84,16 +90,17 @@ class BNCDownloader:
             df[EXCH] = BINANCE
             df[AT] = datetime.utcnow()
             df = df[
-                [DT, OPEN, HIGH, LOW, CLOSE, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, \
+                [DATETIME, OPEN, HIGH, LOW, CLOSE, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, \
                  EXCH, AT, "quote_volume", "no_trades", "taker_buy_base", "taker_buy_quote"]
             ]
             logger.info(df.head())
-            self.db_manager.batch_upsert(df.to_dict("records"), f"bar_{freq}", keys=[DT, SYM])
+            return df
+    
 
-
-class BNCConn(ABCConnection):
+class BNCConnecter(ABCConnection):
 
     URL = "https://api.binance.com"
+    EXCHANGE = "BNC"
     
     def __init__(self) -> None:
         super().__init__("history")
@@ -110,6 +117,7 @@ class BNCConn(ABCConnection):
         df[TICK] = df["quoteAssetPrecision"]
         df[LOT] = df["baseAssetPrecision"]
         df[AT] = datetime.utcnow()
-        df = df[[SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, TICK, LOT, AT, "status"]]
+        df[EXCH] = self.EXCHANGE
+        df = df[[SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, TICK, LOT, AT, "status", EXCH]]
         logger.info(df.head())
         self.db_manager.batch_upsert(df.to_dict("records"), "symbols", [SYM])

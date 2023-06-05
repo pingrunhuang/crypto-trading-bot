@@ -53,6 +53,12 @@ requires_python = ">=3.6"
 summary = "Timeout context manager for asyncio programs"
 
 [[package]]
+name = "asynciolimiter"
+version = "1.0.0b1"
+requires_python = ">=3.8"
+summary = "Rate limiter for Async IO"
+
+[[package]]
 name = "attrs"
 version = "23.1.0"
 requires_python = ">=3.7"
@@ -186,6 +192,15 @@ requires_python = ">=3.5"
 summary = "Inline Matplotlib backend for Jupyter"
 dependencies = [
     "traitlets",
+]
+
+[[package]]
+name = "motor"
+version = "3.1.2"
+requires_python = ">=3.7"
+summary = "Non-blocking MongoDB driver for Tornado or asyncio"
+dependencies = [
+    "pymongo<5,>=4.1",
 ]
 
 [[package]]
@@ -376,7 +391,7 @@ dependencies = [
 [metadata]
 lock_version = "4.2"
 groups = ["default"]
-content_hash = "sha256:dc8346ba7e8f3511f142682eb74dfd2ce1923c41298fea348fec24b377336fd9"
+content_hash = "sha256:5ab6e82f1b49c497b32ea4094953c7f435bbf4b80eb3cb7362bc67a705c6f554"
 
 [metadata.files]
 "aiodns 3.0.0" = [
@@ -487,6 +502,9 @@ content_hash = "sha256:dc8346ba7e8f3511f142682eb74dfd2ce1923c41298fea348fec24b37
 "async-timeout 4.0.2" = [
     {url = "https://pypi.tuna.tsinghua.edu.cn/packages/54/6e/9678f7b2993537452710ffb1750c62d2c26df438aa621ad5fa9d1507a43a/async-timeout-4.0.2.tar.gz", hash = "sha256:2163e1640ddb52b7a8c80d0a67a08587e5d245cc9c553a74a847056bc2976b15"},
     {url = "https://pypi.tuna.tsinghua.edu.cn/packages/d6/c1/8991e7c5385b897b8c020cdaad718c5b087a6626d1d11a23e1ea87e325a7/async_timeout-4.0.2-py3-none-any.whl", hash = "sha256:8ca1e4fcf50d07413d66d1a5e416e42cfdf5851c981d679a09851a6853383b3c"},
+]
+"asynciolimiter 1.0.0b1" = [
+    {url = "https://pypi.tuna.tsinghua.edu.cn/packages/c3/be/c0224d957a8d5c17268bf8e9aa4cf46a7ebbd800b0978974cc5dda720526/asynciolimiter-1.0.0b1-py3-none-any.whl", hash = "sha256:0acc028f766e52f7ff3da330ecea90e6cd0e2e1faa90d8840f5c4f25acc6f5f4"},
 ]
 "attrs 23.1.0" = [
     {url = "https://pypi.tuna.tsinghua.edu.cn/packages/97/90/81f95d5f705be17872843536b1868f351805acf6971251ff07c1b8334dbb/attrs-23.1.0.tar.gz", hash = "sha256:6279836d581513a26f1bf235f9acd333bc9115683f14f7e8fae46c98fc50e015"},
@@ -779,6 +797,10 @@ content_hash = "sha256:dc8346ba7e8f3511f142682eb74dfd2ce1923c41298fea348fec24b37
 "matplotlib-inline 0.1.6" = [
     {url = "https://pypi.tuna.tsinghua.edu.cn/packages/d9/50/3af8c0362f26108e54d58c7f38784a3bdae6b9a450bab48ee8482d737f44/matplotlib-inline-0.1.6.tar.gz", hash = "sha256:f887e5f10ba98e8d2b150ddcf4702c1e5f8b3a20005eb0f74bfdbd360ee6f304"},
     {url = "https://pypi.tuna.tsinghua.edu.cn/packages/f2/51/c34d7a1d528efaae3d8ddb18ef45a41f284eacf9e514523b191b7d0872cc/matplotlib_inline-0.1.6-py3-none-any.whl", hash = "sha256:f1f41aab5328aa5aaea9b16d083b128102f8712542f819fe7e6a420ff581b311"},
+]
+"motor 3.1.2" = [
+    {url = "https://pypi.tuna.tsinghua.edu.cn/packages/82/96/ae017cd62761d2fd2cc1eabfc902c3b4e3768fe994fc6a2f474694a56910/motor-3.1.2.tar.gz", hash = "sha256:80c08477c09e70db4f85c99d484f2bafa095772f1d29b3ccb253270f9041da9a"},
+    {url = "https://pypi.tuna.tsinghua.edu.cn/packages/f9/c3/22a695d0e6c373d0a33036de7fdc084068d896e948d11b691c88b6c1672f/motor-3.1.2-py3-none-any.whl", hash = "sha256:4bfc65230853ad61af447088527c1197f91c20ee957cfaea3144226907335716"},
 ]
 "multidict 6.0.4" = [
     {url = "https://pypi.tuna.tsinghua.edu.cn/packages/00/bb/1cdffe9b1ab01830bc9255a64524c34b71c20a4affe5d1000b223a41698d/multidict-6.0.4-cp38-cp38-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:ddd3915998d93fbcd2566ddf9cf62cdb35c9e093075f862935573d265cf8f65d"},

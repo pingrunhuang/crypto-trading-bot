@@ -9,7 +9,7 @@ import json
 from decimal import Decimal
 import zlib
 from requests.api import head
-import websocket
+import websockets
 import yaml
 import _thread as thread
 import time
@@ -172,7 +172,21 @@ class OKEXBot:
             header['x-simulated-trading'] = '1'
         return header
 
-class OKEXSocket(websocket.WebSocket):
+    @staticmethod
+    def grab_symbols()->pd.DataFrame:
+        url = "https://www.okexcn.com/api/spot/v3/instruments"
+        res = requests.get(url)
+        df = pd.DataFrame(res.json())
+        df.drop(columns=["category"], axis=1, inplace=True)
+        df.rename(columns=
+                {"instrument_id": "symbol_exchange", "base_currency": "symbol_base", "quote_currency": "symbol_quote"},
+                inplace=True)
+        df["symbol"] = df["symbol_exchange"].apply(lambda x: "".join(x.split("-")) + ".OKX")
+        df["exchange"] = "OKX"
+        return df
+
+
+class OKEXSocket(websockets):
 
     def __init__(
             self,
@@ -319,13 +333,13 @@ def test1():
     for p in buy_prices:
         size = bot.size_validation(qty, 0.00000001, 0.0001)
         sizes.append(size)
-        bot.order("BTC-USDT", "buy", _type="limit",
+        bot.place_order("BTC-USDT", "buy", _type="limit",
                   price=str(p), size=str(size))
     revenue = 0
     for i in range(len(sell_prices)):
         size = sizes[i]
         p = sell_prices[i]
-        bot.order("BTC-USDT", "sell", _type="limit",
+        bot.place_order("BTC-USDT", "sell", _type="limit",
                   price=str(p), size=str(size))
         revenue += (sell_prices[i] - buy_prices[i]) * size
     logger.info(f"Total revenue will be {revenue} USDT")

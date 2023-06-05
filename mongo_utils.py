@@ -1,31 +1,46 @@
 import yaml
 from pymongo import MongoClient, UpdateOne
+from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
 import logging
 
 
-logger = logging.getLogger("dev")
+logger = logging.getLogger("main")
 
 
-class MongoManger:    
-    setting_path = "./credentials.yaml"
+class BaseMongoManager:
+
+    SETTING_PATH = "./credentials.yaml"
+    DEFAULT_DB = "history"
 
     def __init__(self, db_name: Optional[str]) -> None:
-        with open(self.setting_path) as f:
+        with open(self.SETTING_PATH) as f:
             config = yaml.safe_load(f)
         if isinstance(config, dict):
-            url = config.get("mgo_url")
-            self.mgo_client = MongoClient(url)
+            self.url = config.get("mgo_url")
         else:
             raise ValueError(
-                f"Please make sure format of {self.setting_path} is correct")
+                f"Please make sure format of {self.SETTING_PATH} is correct")
+        self.mgo_client = None
+        self.db = None
         self.setup_db(db_name)
     
     def setup_db(self, db_name: Optional[str]):
+        raise NotImplementedError("Please implement setup_db method")
+
+
+class MongoManger(BaseMongoManager):    
+    
+    SETTING_PATH = "./credentials.yaml"
+
+    def __init__(self, db_name: Optional[str]) -> None:
+        super().__init__(db_name)
+    
+    def setup_db(self, db_name: Optional[str]):
         if not getattr(self, "db", None):
-            self.db = self.mgo_client.get_database(db_name) 
+            self.mgo_client = MongoClient(self.url)
+            self.db = self.mgo_client.get_database(db_name if not db_name else self.DEFAULT_DB)
             logger.info(f"db setup to {self.db}")
-            
 
     def batch_insert(self, data: list, clc: str):
         if getattr(self, "db"):
@@ -48,3 +63,28 @@ class MongoManger:
             msg = "Please call setup_db first"
             logger.error(msg)
             raise ValueError(msg)
+
+
+class AsyncMongoManager(BaseMongoManager):
+
+    SETTING_PATH = "./credentials.yaml"
+
+    def __init__(self, db_name:str) -> None:
+        super().__init__(db_name)
+
+    def setup_db(self, db_name:Optional[str]):
+        if self.db == None:
+            self.mgo_client = AsyncIOMotorClient()
+            self.db = self.mgo_client[db_name if not db_name else self.DEFAULT_DB]
+            logger.info(f"db setup to {self.db}")
+    
+    async def batch_upsert(self, data:list[dict], clc:str, keys:list[str]=["_id"]):
+        coll = self.db[clc]
+        for doc in data:
+            result = await coll.update_one(
+                filter={x:doc[x] for x in keys}, 
+                update={"$set": doc}, 
+                upsert=True)
+            logger.debug(f"Upserting {doc}: {result}")
+        
+    

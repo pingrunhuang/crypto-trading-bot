@@ -1,5 +1,5 @@
+import asyncio
 from connections import historical_downloaders, conns
-from eastmoney import calc_funding
 from datetime import datetime, timedelta
 import click
 import logging
@@ -13,16 +13,25 @@ config_manager = ConfigManager()
 @click.option("--sym_base", prompt="symbol base")
 @click.option("--sym_quote", default="USDT", prompt="symbol quote")
 @click.option("--dt", prompt="date you wanna grab", help="in %Y-%m-%d format")
-def store_daily_trades(sym_base:str, sym_quote:str, dt:str, exch:str):
+def grab_daily_trades(sym_base:str, sym_quote:str, dt:str, exch:str):
     con = historical_downloaders[exch]()
-    con.store_spot_trades(sym_base, sym_quote, datetime.strptime(dt, "%Y-%m-%d"))
+    con.fetch_spot_trades(sym_base, sym_quote, datetime.strptime(dt, "%Y-%m-%d"))
 
 
-def store_klines(sym_base:str, sym_quote:str, freq:str, dt:datetime, exch:str, db_name:str):
-    logger.info(f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} at {dt}")
-    conn = historical_downloaders[exch](db_name)
-    conn.store_spot_klines(sym_base, sym_quote, freq, dt)
-    
+async def grab_klines(sym_base:str,
+                 sym_quote:str,
+                 freq:str,
+                 exch:str,
+                 db_name:str,
+                 dt1:datetime,
+                 dt2:datetime):
+    while dt1 <= dt2:
+        logger.info(f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} at {dt1}")
+        downloader = historical_downloaders[exch](db_name)
+        df = downloader.fetch_spot_klines(sym_base, sym_quote, freq, dt1)
+        await downloader.upsert_df(df, f"bar_{freq}", ["datetime", "symbol"])
+        dt1 += timedelta(days=1)
+
 
 def upsert_symbols(exch:str):
     conn = conns[exch]()
@@ -32,27 +41,28 @@ def upsert_symbols(exch:str):
 @click.command()
 @click.option("--funcname", prompt="please enter function name you wanna run")
 def main(funcname:str):
-    if funcname=="store_bnc_daily_trades":
-        store_daily_trades()
-    elif funcname=="store_klines":
-        configs = config_manager.get_kline_config()
+    if funcname=="grab_trades":
+        grab_daily_trades()
+    elif funcname=="grab_klines":
         db_name = "history"
-        configs = configs[db_name]
+        configs = config_manager.get_kline_config(db_name)
         logger.info(f"configs: {configs}")
-        
         # optimization: use asyncio here
-        for base in configs:
-            sdt = datetime.strptime(configs[base]["sdt"], "%Y-%m-%d")
-            edt = datetime.strptime(configs[base]["edt"], "%Y-%m-%d") \
-                if configs[base].get("edt") else datetime.utcnow().date()
-            exch = configs[base]["exch"]
-            for quote in configs[base]["quote"]:
-                for freq in configs[base]["freq"]:
-                    while sdt <= edt:
-                        store_klines(base, quote, freq, sdt, exch, db_name)
-                        sdt += timedelta(days=1)
-    # elif funcname == "upsert_symbols":
-    #     upsert_symbols()
+        for conf in configs:
+            sdt = conf['sdt']
+            edt = conf["edt"] if conf.get("edt") else datetime.utcnow()
+            exch = conf["exch"]
+            conn_manager = conns[exch]()
+            symbols_map = conn_manager.get_symbol_maps()
+            for sym in conf["symbols"]:
+                sym_quote = symbols_map[f"{sym}.{exch}"]
+                sym_base = sym[:len(sym)-len(f'{sym_quote}')]
+                for freq in conf["freq"]:
+                    asyncio.run(grab_klines(sym_base, sym_quote, freq, exch, db_name, sdt, edt))
+    elif funcname == "upsert_symbols":
+        for exch in config_manager.get_symbol_config("history"): 
+            upsert_symbols(exch)
+
 
 if __name__=="__main__":
     main()
