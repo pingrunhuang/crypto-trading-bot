@@ -49,10 +49,9 @@ class BNCDownloader(ABCDownloader):
         endpoint = f"{self.API_URL}/spot/daily/trades/{sym_root}"
         dt_str = dt.strftime("%Y-%m-%d")
         filename = f"{sym_root}-trades-{dt_str}"
-        async with self.download_zip(
-            endpoint, 
-            filename, 
-            ["trade_id", "price", "qty", "quo_qty", "datetime", "isBuyerMaker", "isMatch"]) as df:
+        async with self.download_zip(endpoint, 
+                                     filename, 
+                                     ["trade_id", "price", "qty", "quo_qty", "datetime", "isBuyerMaker", "isMatch"]) as df:
             df[BUY_SELL] = np.where(df["isBuyerMaker"], "sell", "buy")
             df[DATETIME] = pd.to_datetime(df["datetime"], unit="ms")
             df[SYM] = f"{sym_base}{sym_quote}.{BINANCE}"
