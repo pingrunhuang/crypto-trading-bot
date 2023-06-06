@@ -16,6 +16,10 @@ dependencies = [
     "ipython>=8.13.2",
     "asynciolimiter>=1.0.0b1",
     "motor>=3.1.2",
+    "python-binance>=1.0.17",
+    "anyio>=3.6.2",
+    "async-unzip>=0.3.6",
+    "aiofile>=3.8.5",
 ]
 requires-python = ">=3.11"
 license = {text = "MIT"}

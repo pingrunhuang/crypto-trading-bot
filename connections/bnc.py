@@ -5,14 +5,15 @@ from datetime import datetime
 import requests
 from io import BytesIO
 import logging
-from mongo_utils import MongoManger, AsyncMongoManager
 import shutil
 import os
-from utils import unzip
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from consts import DATETIME, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, EXCH, \
     BINANCE, BUY_SELL, AT, OPEN, HIGH, LOW, CLOSE, TICK, LOT
 from connections.base import ABCConnection, ABCDownloader
+# from async_unzip.unzipper import unzip
+from utils import unzip
+from aiohttp import ClientSession
 
 logger = logging.getLogger(__name__)
 
@@ -24,21 +25,21 @@ class BNCDownloader(ABCDownloader):
     def __init__(self, db_name:str="history") -> None:
         super().__init__(db_name)
     
-    @contextmanager
-    def download_zip(self, endpoint:str, filename:str):
+    @asynccontextmanager
+    async def download_zip(self, endpoint:str, filename:str, columns:list[str]):
         if not os.path.exists(filename):
             endpoint = f"{endpoint}/{filename}.zip"
-            ret = requests.get(endpoint, stream=True)
-            logger.info(f"Dowloading zip file from: {endpoint}")
-            unzip(filename, BytesIO(ret.content))
-            if not ret.ok:
-                logger.error(ret.reason)
-                if ret.status_code != 404:
-                    ret.raise_for_status()
-        yield
+            async with ClientSession() as session:
+                ret = await session.get(endpoint)
+                logger.info(f"Dowloading zip file from: {endpoint}")
+                ret.raise_for_status()
+                content = await ret.content.readany()
+                unzip(BytesIO(content), filename)
+        df = pd.read_csv(f"{filename}/{filename}.csv", names=columns)
+        yield df
         shutil.rmtree(filename)
 
-    def fetch_spot_trades(self, 
+    async def fetch_spot_trades(self, 
                           sym_base:str, 
                           sym_quote:str, 
                           dt:Optional[datetime])->pd.DataFrame:
@@ -48,14 +49,13 @@ class BNCDownloader(ABCDownloader):
         endpoint = f"{self.API_URL}/spot/daily/trades/{sym_root}"
         dt_str = dt.strftime("%Y-%m-%d")
         filename = f"{sym_root}-trades-{dt_str}"
-        with self.download_zip(endpoint, filename):
-            df = pd.read_csv(
-                f"{filename}/{filename}.csv",
-                names=["trade_id", "price", "qty", "quo_qty", "datetime", "isBuyerMaker", "isMatch"]
-            )
+        async with self.download_zip(
+            endpoint, 
+            filename, 
+            ["trade_id", "price", "qty", "quo_qty", "datetime", "isBuyerMaker", "isMatch"]) as df:
             df[BUY_SELL] = np.where(df["isBuyerMaker"], "sell", "buy")
             df[DATETIME] = pd.to_datetime(df["datetime"], unit="ms")
-            df[SYM] = f"{sym_base}{sym_quote}.BNC"
+            df[SYM] = f"{sym_base}{sym_quote}.{BINANCE}"
             df[SYM_BASE] = sym_base
             df[SYM_QUOTE] = sym_quote
             df[EXCH] = BINANCE
@@ -65,7 +65,7 @@ class BNCDownloader(ABCDownloader):
             logger.debug(df.head())
             return df
     
-    def fetch_spot_klines(self, 
+    async def fetch_spot_klines(self, 
                           sym_base:str, 
                           sym_quote:str, 
                           freq:str, 
@@ -76,11 +76,9 @@ class BNCDownloader(ABCDownloader):
         dt_str = dt.strftime("%Y-%m-%d")
         endpoint = f"{self.API_URL}/spot/daily/klines/{sym_root}/{freq}"
         filename = f"{sym_root}-{freq}-{dt_str}"
-        with self.download_zip(endpoint, filename):
-            df = pd.read_csv(
-                f"{filename}/{filename}.csv",
-                names=["datetime", "open", "high", "low", "close", "volume", "close_dt", "quote_volume", "no_trades", "taker_buy_base", "taker_buy_quote", "/"]
-            )
+        async with self.download_zip(endpoint, 
+                                     filename,
+                                     ["datetime", "open", "high", "low", "close", "volume", "close_dt", "quote_volume", "no_trades", "taker_buy_base", "taker_buy_quote", "/"]) as df:
             logger.info(df.head())
             df[DATETIME] = pd.to_datetime(df["datetime"], unit="ms")
             df[SYM] = f"{sym_base}{sym_quote}.{BINANCE}"
@@ -91,7 +89,7 @@ class BNCDownloader(ABCDownloader):
             df[AT] = datetime.utcnow()
             df = df[
                 [DATETIME, OPEN, HIGH, LOW, CLOSE, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, \
-                 EXCH, AT, "quote_volume", "no_trades", "taker_buy_base", "taker_buy_quote"]
+                    EXCH, AT, "quote_volume", "no_trades", "taker_buy_base", "taker_buy_quote"]
             ]
             logger.info(df.head())
             return df

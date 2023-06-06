@@ -3,3 +3,5 @@ __pypackages__
 __pycache__/.pdm-python
 .vscode
 credentials.yaml
+*__pycache__*
+*.log

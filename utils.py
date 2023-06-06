@@ -69,11 +69,13 @@ def sign(timestamp:str, method:str, endpoint:str, secret:str, params:Optional[st
     return sign
 
 
-def unzip(filename:str, content:Union[str, BytesIO, bytes]):
+def unzip(content:Union[str, BytesIO, bytes], filename:str):
     logger.info(f"Extracting zipfile from: {filename}")
     if isinstance(content, bytes):
         content = BytesIO(content)
     elif isinstance(content, str):
         content = BytesIO(content.encode("utf-8"))
     z = zipfile.ZipFile(content)
+    assert zipfile.is_zipfile(content)
     z.extractall(filename)
+

@@ -14,7 +14,7 @@ class BaseMongoManager:
     DEFAULT_DB = "history"
 
     def __init__(self, db_name: Optional[str]) -> None:
-        with open(self.SETTING_PATH) as f:
+        with open(self.SETTING_PATH, mode="r") as f:
             config = yaml.safe_load(f)
         if isinstance(config, dict):
             self.url = config.get("mgo_url")

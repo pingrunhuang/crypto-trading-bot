@@ -13,7 +13,9 @@ class ABCDownloader:
         self.db_manager = AsyncMongoManager(db_name)
 
     async def upsert_df(self, df:pd.DataFrame, clc_name:str, keys:list[str]):
-        await self.db_manager.batch_upsert(df.to_dict("records"), clc_name, keys)
+        records = df.to_dict("records")
+        logger.info(f"Inserting {len(records)} into {clc_name}")
+        await self.db_manager.batch_upsert(records, clc_name, keys)
 
 class ABCConnection:
 
