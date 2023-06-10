@@ -1,6 +1,8 @@
+import loggers
 import logging
 import pandas as pd
-from mongo_utils import MongoManger
+from mongo_utils import MongoManger, AsyncMongoManager
+from eastmoney.kline_grabber import fetch_kline_1d, fetch_kline_1h
 
 logger = logging.getLogger(__name__)
 
@@ -42,3 +44,13 @@ def calc_funding():
     logger.info(f"Total withdraw: {abs(withdraw_df['funding_cny'].sum())}")
     deposite_df = df[(df['funding_cny'] > 0) & (df['status'] == "交易成功")]
     logger.info(f"Total deposite: {deposite_df['funding_cny'].sum()}")
+
+
+async def fetch_kline(sec_id:str, freq:str, sdt:str, edt:str, db_name:str):
+    db = AsyncMongoManager(db_name)
+    if freq == "1d":
+        res = await fetch_kline_1d(sec_id, sdt, edt)
+        await db.batch_upsert(res, "bar_1d", keys=["datetime", "code"])
+    elif freq == "1h":
+        res = await fetch_kline_1h(sec_id, sdt, edt)
+        await db.batch_upsert(res, "bar_1h", keys=["datetime", "code"])

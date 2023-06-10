@@ -1,5 +1,5 @@
-- symbols: [BTCBUSD] 
-  sdt: 2023-05-04T00:00:00
-  edt: 2023-05-05T00:00:00
+- symbols: [BNBBUSD] 
+  sdt: 2023-01-01T00:00:00
+  edt: 2023-06-05T00:00:00
   freq: [1h]
   exch: BNC

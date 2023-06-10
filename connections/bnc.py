@@ -2,18 +2,22 @@ from typing import Optional
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import requests
 from io import BytesIO
 import logging
 import shutil
 import os
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 from consts import DATETIME, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, EXCH, \
     BINANCE, BUY_SELL, AT, OPEN, HIGH, LOW, CLOSE, TICK, LOT
-from connections.base import ABCConnection, ABCDownloader
-# from async_unzip.unzipper import unzip
+from connections.base import ABCConnection, ABCDownloader, ABCWebsockets
 from utils import unzip
 from aiohttp import ClientSession
+from websockets.client import WebSocketClientProtocol
+from websockets.exceptions import ConnectionClosedError
+import json
+import random
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +30,10 @@ class BNCDownloader(ABCDownloader):
         super().__init__(db_name)
     
     @asynccontextmanager
-    async def download_zip(self, endpoint:str, filename:str, columns:list[str]):
+    async def download_zip(self, 
+                           endpoint:str, 
+                           filename:str, 
+                           columns:list[str])->AsyncIterator[pd.DataFrame]:
         if not os.path.exists(filename):
             endpoint = f"{endpoint}/{filename}.zip"
             async with ClientSession() as session:
@@ -40,9 +47,9 @@ class BNCDownloader(ABCDownloader):
         shutil.rmtree(filename)
 
     async def fetch_spot_trades(self, 
-                          sym_base:str, 
-                          sym_quote:str, 
-                          dt:Optional[datetime])->pd.DataFrame:
+                                sym_base:str, 
+                                sym_quote:str, 
+                                dt:Optional[datetime])->pd.DataFrame:
         if not dt:
             dt = datetime.utcnow()
         sym_root = f"{sym_base.upper()}{sym_quote.upper()}"
@@ -65,10 +72,10 @@ class BNCDownloader(ABCDownloader):
             return df
     
     async def fetch_spot_klines(self, 
-                          sym_base:str, 
-                          sym_quote:str, 
-                          freq:str, 
-                          dt:Optional[datetime])->pd.DataFrame:
+                                sym_base:str, 
+                                sym_quote:str, 
+                                freq:str, 
+                                dt:Optional[datetime])->pd.DataFrame:
         if not dt:
             dt = datetime.utcnow()
         sym_root = f"{sym_base.upper()}{sym_quote.upper()}"
@@ -118,3 +125,52 @@ class BNCConnecter(ABCConnection):
         df = df[[SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, TICK, LOT, AT, "status", EXCH]]
         logger.info(df.head())
         self.db_manager.batch_upsert(df.to_dict("records"), "symbols", [SYM])
+
+from win32com.client import Dispatch
+class BNCWebSockets(ABCWebsockets):
+
+
+    URL = "wss://data-stream.binance.vision"
+    
+    async def on_receiving(self, socket:WebSocketClientProtocol) -> dict:
+        msg = await socket.recv()
+        logger.debug(f"on receiving raw message: {msg}")
+        return json.loads(msg)
+
+    async def on_sending(self, socket: WebSocketClientProtocol, **kwargs):
+        msg = json.dumps({
+            "method": kwargs.pop("method").upper(),
+            "params": kwargs.pop("params"),
+            "id": random.randint(1, 100)}
+        )
+        await socket.send(msg)
+    
+    def is_breach(self, init_prx:float, prx:float):
+        speak = Dispatch("SAPI.SpVoice").Speak
+        threshold = 0.1
+        cur_thread = abs((init_prx-prx)/init_prx)
+        res = cur_thread>threshold
+        if res:
+            speak(f"Current price breach: {cur_thread}")
+            raise KeyboardInterrupt()
+        return res
+
+    async def run(self, endpoint:str, **kwargs):
+        async with self.open_socket(endpoint) as socket:
+            await self.on_sending(socket, **kwargs)
+            while True:
+                data = await self.on_receiving(socket)
+                try:
+                    sym = data['s']
+                    prx = float(data['k']['c'])
+                    vol = float(data['k']['v'])
+                    logger.info(f"{sym} price={prx} vol={vol}")
+                    if self.is_breach(26630, prx):
+                        break
+                except KeyError:
+                    logger.warn(data)
+                except KeyboardInterrupt:
+                    break
+                except ConnectionClosedError:
+                    pong = await socket.ping("ping")
+                    logger.warn(f"ping timeout: {pong}")

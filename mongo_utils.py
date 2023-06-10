@@ -39,7 +39,7 @@ class MongoManger(BaseMongoManager):
     def setup_db(self, db_name: Optional[str]):
         if not getattr(self, "db", None):
             self.mgo_client = MongoClient(self.url)
-            self.db = self.mgo_client.get_database(db_name if not db_name else self.DEFAULT_DB)
+            self.db = self.mgo_client.get_database(db_name if db_name else self.DEFAULT_DB)
             logger.info(f"db setup to {self.db}")
 
     def batch_insert(self, data: list, clc: str):
@@ -50,7 +50,7 @@ class MongoManger(BaseMongoManager):
             logger.error(msg)
             raise ValueError(msg)
 
-    def batch_upsert(self, data: list, clc: str, keys: list[str] = ["_id"]):
+    def batch_upsert(self, data: list[dict], clc: str, keys: list[str] = ["_id"]):
         to_update = [
             UpdateOne({k: x[k] for k in keys}, {"$set": x}, upsert=True) for x in data
         ]
@@ -73,9 +73,10 @@ class AsyncMongoManager(BaseMongoManager):
         super().__init__(db_name)
 
     def setup_db(self, db_name:Optional[str]):
+        logger.info(f"Setting up db={db_name}")
         if self.db == None:
             self.mgo_client = AsyncIOMotorClient()
-            self.db = self.mgo_client[db_name if not db_name else self.DEFAULT_DB]
+            self.db = self.mgo_client[db_name if db_name else self.DEFAULT_DB]
             logger.info(f"db setup to {self.db}")
     
     async def batch_upsert(self, data:list[dict], clc:str, keys:list[str]=["_id"]):
@@ -86,5 +87,8 @@ class AsyncMongoManager(BaseMongoManager):
                 update={"$set": doc}, 
                 upsert=True)
             logger.debug(f"Upserting {doc}: {result}")
-        
     
+    async def batch_insert(self, data: list[dict], clc: str):
+        coll = self.db[clc]
+        result = await coll.insert_many(data)
+        logger.info(f"Inserted {len(result.inserted_ids)} docs")

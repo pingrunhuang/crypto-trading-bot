@@ -4,6 +4,9 @@ import logging
 from mongo_utils import AsyncMongoManager, MongoManger
 import pandas as pd
 from consts import EXCH, SYM, SYM_QUOTE
+from contextlib import asynccontextmanager
+from typing import Optional, AsyncIterator, Coroutine
+from websockets.client import WebSocketClientProtocol, connect
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +48,36 @@ class ABCConnection:
         symbols = clc.find({EXCH: self.EXCHANGE}, projection=[SYM, SYM_QUOTE])
         result = {x[SYM]: x[SYM_QUOTE] for x in symbols}
         return result
+
+
+class ABCWebsockets:
+    
+    URL = ""
+    EXCHANGE = ""
+    def __init__(self, 
+                 close_timeout:Optional[int]=None, 
+                 ping_interval:Optional[int]=30,
+                 ping_timeout:Optional[int]=30) -> None:
+        self.close_timeout = close_timeout
+        self.ping_interval = ping_interval
+        self.ping_timeout = ping_timeout
+
+    @asynccontextmanager
+    async def open_socket(self, endpoint:str)-> AsyncIterator[WebSocketClientProtocol]:
+        url = self.URL + endpoint
+        logger.info(f"websocket connecting to {url}")
+        socket = await connect(url, 
+                               close_timeout=self.close_timeout,
+                               ping_interval=self.ping_interval,
+                               ping_timeout=self.ping_timeout)
+        yield socket
+        await socket.close()
+    
+    async def on_sending(self, 
+                         socket:WebSocketClientProtocol,
+                         **kwargs):
+        raise NotImplementedError()
+
+    async def on_receiving(self, data:dict)->dict:
+        raise NotImplementedError("Please implement your decoding method")
+    

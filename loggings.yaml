@@ -9,7 +9,7 @@ handlers:
   console:
     class: logging.StreamHandler
     formatter: default
-    level: DEBUG
+    level: INFO
   file:
     class: logging.handlers.RotatingFileHandler
     formatter: default
@@ -34,5 +34,5 @@ loggers:
     handlers: [console, file, error]
     level: DEBUG
   main:
-    handlers: [console, error]
-    level: INFO
+    handlers: [console, file, error]
+    level: DEBUG
