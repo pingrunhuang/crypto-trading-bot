@@ -1,3 +1,4 @@
+from enum import Enum
 # exchanges
 BINANCE = "BNC"
 
@@ -18,3 +19,9 @@ EXCH= "exchange"
 BUY_SELL = "buy_sell"
 TICK = "tick_size"
 LOT = "lot_size"
+
+class ORDERTYPE(Enum):
+    LIMIT="LIMIT"
+    MARKET="MARKET"
+    STOP_LOSS="STOP_LOSS"
+    

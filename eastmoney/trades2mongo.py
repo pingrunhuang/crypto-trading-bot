@@ -1,6 +1,6 @@
 import logging
 import pandas as pd
-from mongo_utils import MongoManger
+from mongo_utils import MongoManager
 import json
 
 
@@ -40,8 +40,8 @@ def trades2mongo(historical_json: str, db_name: str = "fund"):
     logger.info(f"Origianl number of trades: {len(df)}")
     data = df[columns].drop_duplicates()
     logger.info(f"Unique number of trades: {len(data)}")
-    mgo_manager = MongoManger(db_name)
-    mgo_manager.batch_upsert(data.to_dict("records"), "em_trades", "trade_id")
+    mgo_manager = MongoManager(db_name)
+    mgo_manager.batch_upsert(data.to_dict("records"), "em_trades", ["trade_id"])
 
 
 if __name__ == "__main__":

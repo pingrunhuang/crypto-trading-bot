@@ -29,7 +29,7 @@ class BaseMongoManager:
         raise NotImplementedError("Please implement setup_db method")
 
 
-class MongoManger(BaseMongoManager):    
+class MongoManager(BaseMongoManager):    
     
     SETTING_PATH = "./credentials.yaml"
 

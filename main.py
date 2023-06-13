@@ -6,8 +6,10 @@ import loggers
 import logging
 from config_managers import ConfigManager
 import eastmoney
+import aiohttp
 
 logger = logging.getLogger("main")
+
 
 config_manager = ConfigManager()
 
@@ -18,29 +20,51 @@ async def grab_daily_trades(sym_base:str,
                             db_name:str, 
                             dt1:datetime,
                             dt2:datetime):
-    con = connections.historical_downloaders[exch](db_name)
+    MAX_CONNECTIONS = 10
+    session = aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(limit=MAX_CONNECTIONS, ttl_dns_cache=300)
+    )
+    con = connections.historical_downloaders[exch](session, db_name)
+    futures = []
+    semaphore = asyncio.Semaphore(MAX_CONNECTIONS)
+
+    async def _grab_daily_trades(dt):
+        async with semaphore:
+            df = await con.fetch_spot_trades(sym_base, sym_quote, dt)
+            await con.upsert_df(df, "trades", ["trade_id"])
+    
     while dt1<dt2:
         logger.info(f"Fetching trades of {sym_base}{sym_quote}.{exch} at {dt1}")
-        df = await con.fetch_spot_trades(sym_base, sym_quote, dt1)
-        await con.upsert_df(df, "trades", ["trade_id"])
+        futures.append(_grab_daily_trades(dt1))
         dt1+=timedelta(days=1)
 
-def grab_klines(db_name:str):
+    await asyncio.gather(*futures)
+
+
+async def grab_klines(db_name:str):
+    MAX_CONNECTIONS = 10
+    session = aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(limit=MAX_CONNECTIONS, ttl_dns_cache=300)
+    )
+    futures = []
+    semaphore = asyncio.Semaphore(MAX_CONNECTIONS)
+
     async def _grab_klines(sym_base:str,
-                    sym_quote:str,
-                    freq:str,
-                    exch:str,
-                    db_name:str,
-                    dt1:datetime,
-                    dt2:datetime):
-        downloader = connections.historical_downloaders[exch](db_name)
+                            sym_quote:str,
+                            freq:str,
+                            exch:str,
+                            dt1:datetime,
+                            dt2:datetime):
+        
         while dt1 <= dt2:
-            logger.info(f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} at {dt1}")
-            df = await downloader.fetch_spot_klines(sym_base, sym_quote, freq, dt1)
-            await downloader.upsert_df(df, f"bar_{freq}", ["datetime", "symbol"])
-            dt1 += timedelta(days=1)
+            async with semaphore:
+                logger.info(f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} at {dt1}")
+                df = await downloader.fetch_spot_klines(sym_base, sym_quote, freq, dt1)
+                await downloader.upsert_df(df, f"bar_{freq}", ["datetime", "symbol"])
+                dt1 += timedelta(days=1)
 
     configs = config_manager.get_kline_config(db_name)
+    
     logger.info(f"configs: {configs}")
     for conf in configs:
         sdt = conf['sdt']
@@ -48,13 +72,16 @@ def grab_klines(db_name:str):
         exch = conf["exch"]
         conn_manager = connections.conns[exch]()
         symbols_map = conn_manager.get_symbol_maps()
+        downloader = connections.historical_downloaders[exch](session, db_name)
+        
         for sym in conf["symbols"]:
             sym_quote = symbols_map[f"{sym}.{exch}"]
             sym_base = sym[:len(sym)-len(f'{sym_quote}')]
             for freq in conf["freq"]:
-                asyncio.run(
-                    _grab_klines(sym_base, sym_quote, freq, exch, db_name, sdt, edt)
+                futures.append(
+                    _grab_klines(sym_base, sym_quote, freq, exch, sdt, edt)
                 )
+    await asyncio.gather(*futures)
 
 
 async def eastmoney_kline(db_name:str):
@@ -101,7 +128,7 @@ def main(funcname:str):
                 sym_base = sym[:len(sym)-len(f'{sym_quote}')]
                 asyncio.run(grab_daily_trades(sym_base, sym_quote, exch, db_name, sdt, edt))
     elif funcname=="grab_klines":
-        grab_klines("history")
+        asyncio.run(grab_klines("history"))
     elif funcname == "upsert_symbols":
         for exch in config_manager.get_symbol_config("history"): 
             upsert_symbols(exch)

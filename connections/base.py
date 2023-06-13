@@ -1,18 +1,21 @@
 from abc import abstractmethod
 import requests
 import logging
-from mongo_utils import AsyncMongoManager, MongoManger
+from mongo_utils import AsyncMongoManager, MongoManager
 import pandas as pd
 from consts import EXCH, SYM, SYM_QUOTE
 from contextlib import asynccontextmanager
-from typing import Optional, AsyncIterator, Coroutine
+from typing import Optional, AsyncIterator
 from websockets.client import WebSocketClientProtocol, connect
+from aiohttp import ClientSession
+from asyncio import Semaphore
 
 logger = logging.getLogger(__name__)
 
 class ABCDownloader:
     
-    def __init__(self, db_name:str="history") -> None:
+    def __init__(self, sess:ClientSession, db_name:str="history", semaphore:Optional[Semaphore]=None) -> None:
+        self.session = sess
         self.db_manager = AsyncMongoManager(db_name)
 
     async def upsert_df(self, df:pd.DataFrame, clc_name:str, keys:list[str]):
@@ -26,7 +29,7 @@ class ABCConnection:
     EXCHANGE = ""
     
     def __init__(self, db_name="history"):
-        self.db_manager = MongoManger(db_name)
+        self.db_manager = MongoManager(db_name)
 
     @abstractmethod
     def ohlcv(self, end_point: str):
@@ -48,6 +51,8 @@ class ABCConnection:
         symbols = clc.find({EXCH: self.EXCHANGE}, projection=[SYM, SYM_QUOTE])
         result = {x[SYM]: x[SYM_QUOTE] for x in symbols}
         return result
+    
+    # def place_order(self,)
 
 
 class ABCWebsockets:

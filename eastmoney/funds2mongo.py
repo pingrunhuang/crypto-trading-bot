@@ -1,5 +1,5 @@
 import pandas as pd
-from mongo_utils import MongoManger
+from mongo_utils import MongoManager
 import json
 import logging
 import datetime
@@ -29,7 +29,7 @@ def funds2mongo(funds_json: str, db_name: str = "fund"):
     logger.info(f"Origianl number of transfer: {len(df)}")
     data = df[columns].drop_duplicates()
     logger.info(f"Unique number of transfer: {len(data)}")
-    mgo_manager = MongoManger(db_name)
+    mgo_manager = MongoManager(db_name)
     mgo_manager.batch_insert(data.to_dict("records"), "account_balance")
 
 

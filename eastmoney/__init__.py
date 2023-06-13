@@ -1,7 +1,7 @@
-import loggers
+import logging
 import logging
 import pandas as pd
-from mongo_utils import MongoManger, AsyncMongoManager
+from mongo_utils import MongoManager, AsyncMongoManager
 from eastmoney.kline_grabber import fetch_kline_1d, fetch_kline_1h
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def calc_pnl(data: dict, assets_ntl: float):
 
 
 def calc_funding():
-    manager = MongoManger("fund")
+    manager = MongoManager("fund")
     clc = manager.db.get_collection("account_balance")
     res = clc.find({}, sort=[("datetime", -1)])
     df = pd.DataFrame(res)

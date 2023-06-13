@@ -17,6 +17,7 @@ from websockets.client import WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError
 import json
 import random
+from win32com.client import Dispatch
 
 
 logger = logging.getLogger(__name__)
@@ -26,20 +27,24 @@ class BNCDownloader(ABCDownloader):
     binance historical data downloader
     """
     API_URL = "https://data.binance.vision/data"
-    def __init__(self, db_name:str="history") -> None:
-        super().__init__(db_name)
-    
+    def __init__(self,
+                 session: ClientSession,
+                 db_name:str="history") -> None:
+        super().__init__(session, db_name)
+
     @asynccontextmanager
     async def download_zip(self, 
                            endpoint:str, 
                            filename:str, 
                            columns:list[str])->AsyncIterator[pd.DataFrame]:
+
         if not os.path.exists(filename):
             endpoint = f"{endpoint}/{filename}.zip"
-            async with ClientSession() as session:
-                ret = await session.get(endpoint)
+            async with self.session.get(endpoint) as ret:
                 logger.info(f"Dowloading zip file from: {endpoint}")
-                ret.raise_for_status()
+                if ret.status==404:
+                    yield pd.DataFrame(data=[], columns=columns)
+                    return
                 content = await ret.content.readany()
                 unzip(BytesIO(content), filename)
         df = pd.read_csv(f"{filename}/{filename}.csv", names=columns)
@@ -126,7 +131,6 @@ class BNCConnecter(ABCConnection):
         logger.info(df.head())
         self.db_manager.batch_upsert(df.to_dict("records"), "symbols", [SYM])
 
-from win32com.client import Dispatch
 class BNCWebSockets(ABCWebsockets):
 
 
