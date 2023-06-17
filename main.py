@@ -102,11 +102,24 @@ def upsert_symbols(exch:str):
 
 
 async def run_websockets():
+    from win32com.client import Dispatch
+
+    def is_breach(price:float):
+        speak = Dispatch("SAPI.SpVoice").Speak
+        tgt_prx = 27000
+        res = price>tgt_prx
+        if res:
+            speak(f"Current price breach: {tgt_prx}")
+            raise KeyboardInterrupt()
+        return res
+    
     socket = connections.BNCWebSockets()
     params = {
         "method": "SUBSCRIBE", 
-        "params": ["btcusdt@kline_1h"]
+        "params": ["btcusdt@kline_1h"],
+        "is_breach": is_breach
     }
+    
     await socket.run("/ws/btcusdt@kline_1h", **params)
 
 

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -17,8 +17,6 @@ from websockets.client import WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError
 import json
 import random
-from win32com.client import Dispatch
-
 
 logger = logging.getLogger(__name__)
 
@@ -148,18 +146,12 @@ class BNCWebSockets(ABCWebsockets):
             "id": random.randint(1, 100)}
         )
         await socket.send(msg)
-    
-    def is_breach(self, init_prx:float, prx:float):
-        speak = Dispatch("SAPI.SpVoice").Speak
-        threshold = 0.1
-        cur_thread = abs((init_prx-prx)/init_prx)
-        res = cur_thread>threshold
-        if res:
-            speak(f"Current price breach: {cur_thread}")
-            raise KeyboardInterrupt()
-        return res
 
     async def run(self, endpoint:str, **kwargs):
+        is_breach_func:Optional[Callable] = kwargs.get("is_breach")
+        if not is_breach_func:
+            raise ValueError(f"Please provide a breach function")
+        
         async with self.open_socket(endpoint) as socket:
             await self.on_sending(socket, **kwargs)
             while True:
@@ -169,7 +161,7 @@ class BNCWebSockets(ABCWebsockets):
                     prx = float(data['k']['c'])
                     vol = float(data['k']['v'])
                     logger.info(f"{sym} price={prx} vol={vol}")
-                    if self.is_breach(26630, prx):
+                    if is_breach_func(price=prx):
                         break
                 except KeyError:
                     logger.warn(data)
