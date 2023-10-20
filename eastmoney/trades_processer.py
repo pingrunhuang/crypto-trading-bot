@@ -7,9 +7,8 @@ import json
 logger = logging.getLogger(__name__)
 
 
-def trades2mongo(historical_json: str, db_name: str = "fund"):
-
-    with open(historical_json, encoding="utf-8") as fp:
+def load_trades(filename:str)->pd.DataFrame:
+    with open(filename, encoding="utf-8") as fp:
         historical = json.load(fp)
     df = pd.DataFrame(historical)
     column_mapping = {
@@ -40,10 +39,16 @@ def trades2mongo(historical_json: str, db_name: str = "fund"):
     logger.info(f"Origianl number of trades: {len(df)}")
     data = df[columns].drop_duplicates()
     logger.info(f"Unique number of trades: {len(data)}")
+    return data
+
+
+def trades2mongo(filename:str, db_name:str = "fund"):
+    data = load_trades(filename)
     mgo_manager = MongoManager(db_name)
     mgo_manager.batch_upsert(data.to_dict("records"), "em_trades", ["trade_id"])
 
+def trades_generator(filename:str):
+    data = load_trades(filename)
+    for entry in data.to_dict("records"):
+        yield entry
 
-if __name__ == "__main__":
-
-    trades2mongo("data/trades.json")

@@ -31,7 +31,7 @@ build-backend = "pdm.pep517.api"
 [tool.pdm]
 
 [tool.pdm.scripts]
-em-trades = "eastmoney/trades2mongo.py"
+em-trades = "eastmoney/trades_processer.py"
 em-funds = "eastmoney/funds2mongo.py"
 em-funds-calc = "em_calc.py"
 em-klines = "main.py --funcname=eastmoney_klines"
