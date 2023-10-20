@@ -6,6 +6,8 @@ import loggers
 import logging
 from config_managers import ConfigManager
 import eastmoney
+from eastmoney.trades_processer import trades2mongo
+from eastmoney.funds2mongo import funds2mongo
 import aiohttp
 from alerts import voice_alert
 
@@ -155,9 +157,9 @@ def main(funcname:str):
         db_name = "stock"
         asyncio.run(eastmoney_kline(db_name))
     elif funcname == "eastmoney_trades":
-        eastmoney.trades2mongo("eastmoney/data/trades.json")
+        trades2mongo("eastmoney/data/trades.json")
     elif funcname == "eastmoney_funds":
-        eastmoney.funds2mongo("eastmoney/data/funding.json")
+        funds2mongo("eastmoney/data/funding.json")
 
 if __name__=="__main__":
     main()
