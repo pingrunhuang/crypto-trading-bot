@@ -3,6 +3,8 @@ import logging
 import pandas as pd
 from mongo_utils import MongoManager, AsyncMongoManager
 from eastmoney.kline_grabber import fetch_kline_1d, fetch_kline_1h
+from trades_processer import trades2mongo
+from funds2mongo import funds2mongo
 
 logger = logging.getLogger(__name__)
 

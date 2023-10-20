@@ -37,13 +37,13 @@ class MongoManager(BaseMongoManager):
         super().__init__(db_name)
     
     def setup_db(self, db_name: Optional[str]):
-        if not getattr(self, "db", None):
+        if self.db is None:
             self.mgo_client = MongoClient(self.url)
             self.db = self.mgo_client.get_database(db_name if db_name else self.DEFAULT_DB)
             logger.info(f"db setup to {self.db}")
 
     def batch_insert(self, data: list, clc: str):
-        if getattr(self, "db"):
+        if self.db is not None:
             self.db.get_collection(clc).insert_many(data)
         else:
             msg = "Please provide database name at initialization"

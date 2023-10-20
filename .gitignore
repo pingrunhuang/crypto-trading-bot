@@ -5,3 +5,4 @@ __pycache__/.pdm-python
 credentials.yaml
 *__pycache__*
 *.log
+*.log.*

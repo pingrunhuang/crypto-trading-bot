@@ -37,4 +37,4 @@ if __name__ == "__main__":
     import os
     path = os.path.abspath(__file__)
     cur_dir = os.path.dirname(path)
-    funds2mongo(os.path.join(cur_dir, "data/funds.json"))
+    funds2mongo(os.path.join(cur_dir, "data/funding.json"))

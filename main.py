@@ -7,6 +7,8 @@ import logging
 from config_managers import ConfigManager
 import eastmoney
 import aiohttp
+from alerts import voice_alert
+
 
 logger = logging.getLogger("main")
 
@@ -102,26 +104,28 @@ def upsert_symbols(exch:str):
 
 
 async def run_websockets():
-    from win32com.client import Dispatch
-
-    def is_breach(price:float):
-        speak = Dispatch("SAPI.SpVoice").Speak
-        tgt_prx = 27000
-        res = price>tgt_prx
+   
+    def is_breach(prev_price:float, cur_price:float, vol:float):
+        
+        threshold_pct = 0.2
+        tgt_vol = 150000
+        res = abs((cur_price-prev_price)*100/prev_price)>threshold_pct and vol>tgt_vol  
         if res:
-            speak(f"Current price breach: {tgt_prx}")
+            voice_alert(f"current price is greater then previous price by {threshold_pct}%")
             raise KeyboardInterrupt()
         return res
     
     socket = connections.BNCWebSockets()
+    pair = "bnbusdt"
+    interval = "1h"
+    channel = f"{pair}@kline_{interval}"
     params = {
         "method": "SUBSCRIBE", 
-        "params": ["btcusdt@kline_1h"],
+        "params": [channel],
         "is_breach": is_breach
     }
     
-    await socket.run("/ws/btcusdt@kline_1h", **params)
-
+    await socket.run(f"/ws/{channel}", **params)
 
 
 @click.command()
@@ -150,6 +154,10 @@ def main(funcname:str):
     elif funcname == "eastmoney_klines":
         db_name = "stock"
         asyncio.run(eastmoney_kline(db_name))
+    elif funcname == "eastmoney_trades":
+        eastmoney.trades2mongo("eastmoney/data/trades.json")
+    elif funcname == "eastmoney_funds":
+        eastmoney.funds2mongo("eastmoney/data/funding.json")
 
 if __name__=="__main__":
     main()

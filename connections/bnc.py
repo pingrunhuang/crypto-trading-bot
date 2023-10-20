@@ -12,6 +12,7 @@ from consts import DATETIME, VOL, SYM, SYM_BASE, SYM_QUOTE, SYM_ROOT, EXCH, \
     BINANCE, BUY_SELL, AT, OPEN, HIGH, LOW, CLOSE, TICK, LOT
 from connections.base import ABCConnection, ABCDownloader, ABCWebsockets
 from utils import unzip
+from alerts import voice_alert
 from aiohttp import ClientSession
 from websockets.client import WebSocketClientProtocol
 from websockets.exceptions import ConnectionClosedError
@@ -131,7 +132,7 @@ class BNCConnecter(ABCConnection):
 
 class BNCWebSockets(ABCWebsockets):
 
-
+    prev_data = None
     URL = "wss://data-stream.binance.vision"
     
     async def on_receiving(self, socket:WebSocketClientProtocol) -> dict:
@@ -143,9 +144,21 @@ class BNCWebSockets(ABCWebsockets):
         msg = json.dumps({
             "method": kwargs.pop("method").upper(),
             "params": kwargs.pop("params"),
-            "id": random.randint(1, 100)}
-        )
+            "id": random.randint(1, 100)
+            })
         await socket.send(msg)
+    
+    def check_breach(self, data:dict, func:Callable):
+        if not self.prev_data:
+            self.prev_data = data
+        else:
+            try:
+                prev_prx = float(self.prev_data['k']['c'])
+                cur_prx = float(data['k']['c'])
+                vol = float(data['k']['v'])
+                func(prev_prx, cur_prx, vol)
+            finally:
+                self.prev_data = data
 
     async def run(self, endpoint:str, **kwargs):
         is_breach_func:Optional[Callable] = kwargs.get("is_breach")
@@ -156,13 +169,14 @@ class BNCWebSockets(ABCWebsockets):
             await self.on_sending(socket, **kwargs)
             while True:
                 data = await self.on_receiving(socket)
+                if not self.prev_data:
+                    self.prev_data = data
                 try:
                     sym = data['s']
                     prx = float(data['k']['c'])
                     vol = float(data['k']['v'])
                     logger.info(f"{sym} price={prx} vol={vol}")
-                    if is_breach_func(price=prx):
-                        break
+                    self.check_breach(data, is_breach_func)
                 except KeyError:
                     logger.warn(data)
                 except KeyboardInterrupt:
