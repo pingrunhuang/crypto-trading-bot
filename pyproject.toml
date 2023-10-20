@@ -20,6 +20,7 @@ dependencies = [
     "async-unzip>=0.3.6",
     "aiofile>=3.8.5",
     "jupyter>=1.0.0",
+    "matplotlib>=3.7.1",
 ]
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -31,8 +32,8 @@ build-backend = "pdm.pep517.api"
 [tool.pdm]
 
 [tool.pdm.scripts]
-em-trades = "eastmoney/trades_processer.py"
-em-funds = "eastmoney/funds2mongo.py"
+em-trades = "main.py --funcname=eastmoney_trades"
+em-funds = "main.py --funcname=eastmoney_funds"
 em-funds-calc = "em_calc.py"
 em-klines = "main.py --funcname=eastmoney_klines"
 grab_klines = "main.py --funcname=grab_klines"
