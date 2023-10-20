@@ -34,7 +34,7 @@ build-backend = "pdm.pep517.api"
 [tool.pdm.scripts]
 em-trades = "main.py --funcname=eastmoney_trades"
 em-funds = "main.py --funcname=eastmoney_funds"
-em-funds-calc = "em_calc.py"
+em-funds-calc = "main.py --funcname=eastmoney_funding_calc"
 em-klines = "main.py --funcname=eastmoney_klines"
 grab_klines = "main.py --funcname=grab_klines"
 grab_symbols = "main.py --funcname=upsert_symbols"

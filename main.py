@@ -148,18 +148,20 @@ def main(funcname:str):
                 asyncio.run(grab_daily_trades(sym_base, sym_quote, exch, db_name, sdt, edt))
     elif funcname=="grab_klines":
         asyncio.run(grab_klines("history"))
-    elif funcname == "upsert_symbols":
+    elif funcname=="upsert_symbols":
         for exch in config_manager.get_symbol_config("history"): 
             upsert_symbols(exch)
-    elif funcname == "websockets":
+    elif funcname=="websockets":
         asyncio.run(run_websockets())
-    elif funcname == "eastmoney_klines":
+    elif funcname=="eastmoney_klines":
         db_name = "stock"
         asyncio.run(eastmoney_kline(db_name))
-    elif funcname == "eastmoney_trades":
+    elif funcname=="eastmoney_trades":
         trades2mongo("eastmoney/data/trades.json")
-    elif funcname == "eastmoney_funds":
+    elif funcname=="eastmoney_funds":
         funds2mongo("eastmoney/data/funding.json")
+    elif funcname=="eastmoney_funding_calc":
+        eastmoney.calc_funding()
 
 if __name__=="__main__":
     main()

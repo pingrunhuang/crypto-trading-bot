@@ -17,6 +17,7 @@ handlers:
     filename: app.log
     maxBytes: 10240000
     backupCount: 5
+    encoding: utf-8
   error:
     class: logging.handlers.RotatingFileHandler
     formatter: error

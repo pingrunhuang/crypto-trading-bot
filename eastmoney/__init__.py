@@ -42,9 +42,12 @@ def calc_funding():
     df = pd.DataFrame(res)
     logger.info(f"Funding df: {df.head()}")
     withdraw_df = df[(df['funding_cny'] < 0) & (df['status'] == "交易成功")]
-    logger.info(f"Total withdraw: {abs(withdraw_df['funding_cny'].sum())}")
-    deposite_df = df[(df['funding_cny'] > 0) & (df['status'] == "交易成功")]
-    logger.info(f"Total deposite: {deposite_df['funding_cny'].sum()}")
+    total_withdrawal = abs(withdraw_df['funding_cny'].sum())
+    logger.info(f"Total withdraw: {total_withdrawal}")
+    deposit_df = df[(df['funding_cny'] > 0) & (df['status'] == "交易成功")]
+    total_deposit = deposit_df['funding_cny'].sum()
+    logger.info(f"Total deposite: {total_deposit}")
+    logger.info(f"Latest balance: {total_deposit-total_withdrawal}")
 
 
 async def fetch_kline(sec_id:str, freq:str, sdt:str, edt:str, db_name:str):
