@@ -1,6 +1,9 @@
 from enum import Enum
 # exchanges
 BINANCE = "BNC"
+NASDAQ = "NASDAQ"
+New_York_Stock_Exchange = "NYSE"
+HK_Stock_Exchange = "SEHK"
 
 
 # columes

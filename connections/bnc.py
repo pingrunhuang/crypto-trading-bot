@@ -28,7 +28,7 @@ class BNCDownloader(ABCDownloader):
     API_URL = "https://data.binance.vision/data"
     def __init__(self,
                  session: ClientSession,
-                 db_name:str="history") -> None:
+                 db_name:str="hist_data") -> None:
         super().__init__(session, db_name)
 
     @asynccontextmanager
@@ -111,7 +111,7 @@ class BNCConnecter(ABCConnection):
     EXCHANGE = "BNC"
     
     def __init__(self) -> None:
-        super().__init__("history")
+        super().__init__("hist_data")
     
     def upsert_symbols(self):
         endpoint = "/api/v3/exchangeInfo"

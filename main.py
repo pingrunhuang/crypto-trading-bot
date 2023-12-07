@@ -134,7 +134,7 @@ async def run_websockets():
 @click.option("--funcname", prompt="please enter function name you wanna run")
 def main(funcname:str):
     if funcname=="grab_trades":
-        db_name = "history"
+        db_name = "hist_data"
         configs = config_manager.get_kline_config(db_name)
         for conf in configs:
             sdt = conf['sdt']
@@ -147,9 +147,9 @@ def main(funcname:str):
                 sym_base = sym[:len(sym)-len(f'{sym_quote}')]
                 asyncio.run(grab_daily_trades(sym_base, sym_quote, exch, db_name, sdt, edt))
     elif funcname=="grab_klines":
-        asyncio.run(grab_klines("history"))
+        asyncio.run(grab_klines("hist_data"))
     elif funcname=="upsert_symbols":
-        for exch in config_manager.get_symbol_config("history"): 
+        for exch in config_manager.get_symbol_config("hist_data"): 
             upsert_symbols(exch)
     elif funcname=="websockets":
         asyncio.run(run_websockets())

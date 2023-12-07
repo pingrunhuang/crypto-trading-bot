@@ -11,7 +11,7 @@ logger = logging.getLogger("main")
 class BaseMongoManager:
 
     SETTING_PATH = "./credentials.yaml"
-    DEFAULT_DB = "history"
+    DEFAULT_DB = "hist_data"
 
     def __init__(self, db_name: Optional[str]) -> None:
         with open(self.SETTING_PATH, mode="r") as f:

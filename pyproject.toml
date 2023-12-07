@@ -21,6 +21,8 @@ dependencies = [
     "aiofile>=3.8.5",
     "jupyter>=1.0.0",
     "matplotlib>=3.7.1",
+    "futu-api>=7.6.3808",
+    "polar>=0.0.124",
 ]
 requires-python = ">=3.11"
 license = {text = "MIT"}

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ABCDownloader:
     
-    def __init__(self, sess:ClientSession, db_name:str="history", semaphore:Optional[Semaphore]=None) -> None:
+    def __init__(self, sess:ClientSession, db_name:str="hist_data", semaphore:Optional[Semaphore]=None) -> None:
         self.session = sess
         self.db_manager = AsyncMongoManager(db_name)
 
@@ -28,11 +28,11 @@ class ABCConnection:
     URL = ""
     EXCHANGE = ""
     
-    def __init__(self, db_name="history"):
+    def __init__(self, db_name="hist_data"):
         self.db_manager = MongoManager(db_name)
 
     @abstractmethod
-    def ohlcv(self, end_point: str):
+    def ohlcv(self):
         pass
     
     def get(self, endpoint:str, method:str="GET", **kwargs)->requests.Response:
@@ -52,7 +52,9 @@ class ABCConnection:
         result = {x[SYM]: x[SYM_QUOTE] for x in symbols}
         return result
     
-    # def place_order(self,)
+    def upsert(self, data:pd.DataFrame, clc_name:str, keys:list[str]):
+        records = data.to_dict("records")
+        self.db_manager.batch_upsert(records, clc_name, keys)
 
 
 class ABCWebsockets:
