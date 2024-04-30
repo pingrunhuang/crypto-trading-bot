@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 def load_trades(filename:str)->pd.DataFrame:
     with open(filename, encoding="utf-8") as fp:
-        historical = json.load(fp)
+        trades = json.load(fp)
+        historical = trades["Data"]
     df = pd.DataFrame(historical)
     column_mapping = {
         "Cjbh": "trade_id",

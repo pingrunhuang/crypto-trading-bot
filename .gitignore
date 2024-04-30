@@ -6,3 +6,4 @@ credentials.yaml
 *__pycache__*
 *.log
 *.log.*
+./eastmoney/data/*
