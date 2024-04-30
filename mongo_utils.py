@@ -20,26 +20,29 @@ class BaseMongoManager:
             self.url = config.get("mgo_url")
         else:
             raise ValueError(
-                f"Please make sure format of {self.SETTING_PATH} is correct")
+                f"Please make sure format of {self.SETTING_PATH} is correct"
+            )
         self.mgo_client = None
         self.db = None
         self.setup_db(db_name)
-    
+
     def setup_db(self, db_name: Optional[str]):
         raise NotImplementedError("Please implement setup_db method")
 
 
-class MongoManager(BaseMongoManager):    
-    
+class MongoManager(BaseMongoManager):
+
     SETTING_PATH = "./credentials.yaml"
 
     def __init__(self, db_name: Optional[str]) -> None:
         super().__init__(db_name)
-    
+
     def setup_db(self, db_name: Optional[str]):
         if self.db is None:
             self.mgo_client = MongoClient(self.url)
-            self.db = self.mgo_client.get_database(db_name if db_name else self.DEFAULT_DB)
+            self.db = self.mgo_client.get_database(
+                db_name if db_name else self.DEFAULT_DB
+            )
             logger.info(f"db setup to {self.db}")
 
     def batch_insert(self, data: list, clc: str):
@@ -69,25 +72,24 @@ class AsyncMongoManager(BaseMongoManager):
 
     SETTING_PATH = "./credentials.yaml"
 
-    def __init__(self, db_name:str) -> None:
+    def __init__(self, db_name: str) -> None:
         super().__init__(db_name)
 
-    def setup_db(self, db_name:Optional[str]):
+    def setup_db(self, db_name: Optional[str]):
         logger.info(f"Setting up db={db_name}")
         if self.db == None:
             self.mgo_client = AsyncIOMotorClient()
             self.db = self.mgo_client[db_name if db_name else self.DEFAULT_DB]
             logger.info(f"db setup to {self.db}")
-    
-    async def batch_upsert(self, data:list[dict], clc:str, keys:list[str]=["_id"]):
+
+    async def batch_upsert(self, data: list[dict], clc: str, keys: list[str] = ["_id"]):
         coll = self.db[clc]
         for doc in data:
             result = await coll.update_one(
-                filter={x:doc[x] for x in keys}, 
-                update={"$set": doc}, 
-                upsert=True)
+                filter={x: doc[x] for x in keys}, update={"$set": doc}, upsert=True
+            )
             logger.debug(f"Upserting {doc}: {result}")
-    
+
     async def batch_insert(self, data: list[dict], clc: str):
         coll = self.db[clc]
         result = await coll.insert_many(data)

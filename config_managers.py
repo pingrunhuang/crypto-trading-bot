@@ -21,21 +21,23 @@ class ConfigManager:
                 with open(p, "r") as f:
                     config[_type][db_name] += yaml.safe_load(f)
         self.config = config
-    
-    def get_kline_config(self, db_name:str):
+
+    def get_kline_config(self, db_name: str):
         if self.config.get("kline"):
             return self.config["kline"][db_name]
         else:
             raise KeyError(f"Please provide kline config first: {self.config}")
-    
-    def get_trade_config(self, db_name:str):
+
+    def get_trade_config(self, db_name: str):
         if self.config.get("trades"):
             return self.config["trades"][db_name]
         else:
             raise KeyError(f"Please provide trades grabber config first: {self.config}")
 
-    def get_symbol_config(self, db_name:str):
+    def get_symbol_config(self, db_name: str):
         if self.config.get("symbols"):
             return self.config["symbols"][db_name]
         else:
-            raise KeyError(f"Please provide symbols grabber config first: {self.config}")
+            raise KeyError(
+                f"Please provide symbols grabber config first: {self.config}"
+            )

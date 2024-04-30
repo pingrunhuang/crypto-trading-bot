@@ -17,11 +17,10 @@ def funds2mongo(funds_json: str, db_name: str = "fund"):
         "Qrxx": "status",
         "Ywmc": "direction",
         "Zjzh": "trading_account",
-        "Zzje": "funding_cny"
+        "Zzje": "funding_cny",
     }
     df.rename(column_mapping, inplace=True, axis=1)
-    df["datetime"] = pd.to_datetime(
-        df["Zzrq"] + df["Zzsj"], format="%Y-%m-%d%H:%M:%S")
+    df["datetime"] = pd.to_datetime(df["Zzrq"] + df["Zzsj"], format="%Y-%m-%d%H:%M:%S")
     df["updated_at"] = pd.to_datetime(datetime.datetime.utcnow())
     numeric_cols = ["funding_cny", "latest_balance"]
     df[numeric_cols] = df[numeric_cols].astype(float)
@@ -35,6 +34,7 @@ def funds2mongo(funds_json: str, db_name: str = "fund"):
 
 if __name__ == "__main__":
     import os
+
     path = os.path.abspath(__file__)
     cur_dir = os.path.dirname(path)
     funds2mongo(os.path.join(cur_dir, "data/funding.json"))

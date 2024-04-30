@@ -1,4 +1,3 @@
 """
 directional movement index related
 """
-
