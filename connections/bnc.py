@@ -24,7 +24,8 @@ from consts import (
     CLOSE,
     TICK,
     LOT,
-    PROXIES
+    PROXIES,
+    DB_NAME,
 )
 from connections.base import AsyncBaseConnection, BaseConnection
 from utils import unzip
@@ -40,7 +41,7 @@ class AsyncBNCConnecter(AsyncBaseConnection):
 
     URL = "https://api.binance.com"
 
-    def __init__(self, session: ClientSession, db_name: str = "hist_data") -> None:
+    def __init__(self, session: ClientSession, db_name: str = DB_NAME) -> None:
         super().__init__(session, db_name)
 
     async def fetch_klines(
@@ -50,12 +51,12 @@ class AsyncBNCConnecter(AsyncBaseConnection):
             edt = datetime.now(timezone.utc)
 
         sym_root = f"{sym_base.upper()}{sym_quote.upper()}"
-        endpoint = f"/api/v3/klines/"
+        endpoint = f"/api/v3/klines"
         logger.info(f"fetching klines from {sdt} to {edt} for {sym_root}")
         sdt_mill = int(sdt.timestamp()*1000)
         edt_mill = int(edt.timestamp()*1000)
         ret = await self.get(endpoint, symbol=sym_root, interval=freq, startTime=sdt_mill, endTime=edt_mill)
-        df = pd.DataFrame(ret.json(), columns=["datetime", OPEN, HIGH, LOW, CLOSE, VOL, "datetime2", "quote_volumn", "trades", "taker buy base", "taker buy quote", "-"])
+        df = pd.DataFrame(ret, columns=["datetime", OPEN, HIGH, LOW, CLOSE, VOL, "datetime2", "quote_volumn", "trades", "taker buy base", "taker buy quote", "-"])
         logger.info(df.head())
         df[DATETIME] = pd.to_datetime(df["datetime"], unit="ms")
         df[SYM] = f"{sym_base}{sym_quote}.{BINANCE}"
@@ -90,7 +91,7 @@ class BNCConnecter(BaseConnection):
     EXCHANGE = "BNC"
 
     def __init__(self) -> None:
-        super().__init__("hist_data")
+        super().__init__("history")
 
     def upsert_symbols(self):
         endpoint = "/api/v3/exchangeInfo"

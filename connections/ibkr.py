@@ -3,7 +3,7 @@ This is the connection to interactivebroker api
 """
 
 from base import BaseConnection
-from consts import New_York_Stock_Exchange
+from consts import New_York_Stock_Exchange, DB_NAME
 import loggers
 
 logger = loggers.logging.getLogger("connections")
@@ -13,7 +13,7 @@ class IBKRConnector(BaseConnection):
     URL = "https://localhost:5000/v1/api/"
     EXCHANGE = ""
 
-    def __init__(self, db_name="hist_data"):
+    def __init__(self, db_name=DB_NAME):
         super().__init__(db_name)
         self.symbols = {}
 

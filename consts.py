@@ -44,3 +44,4 @@ INTERVAL_MAPPING = {
     "4h": timedelta(hours=4),
     "1d": timedelta(days=1)
 }
+DB_NAME = "history"

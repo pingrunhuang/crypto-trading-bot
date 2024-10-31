@@ -9,8 +9,8 @@ from connections.base import AsyncBaseConnection
 from connections.eastmoney.trades_processer import trades2mongo
 from connections.eastmoney.funds2mongo import funds2mongo
 import aiohttp
-from alerts import voice_alert
-from consts import INTERVAL_MAPPING
+from consts import INTERVAL_MAPPING, DB_NAME
+import socket
 
 logger = LOGGER
 
@@ -42,7 +42,10 @@ async def grab_daily_trades(
 
 async def grab_klines(db_name: str):
     MAX_CONNECTIONS = 10
-    async with aiohttp.ClientSession(trust_env=True) as session:
+    
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(ssl=False, family=socket.AF_INET)
+    ) as session:
         futures = []
         semaphore = asyncio.Semaphore(MAX_CONNECTIONS)
 
@@ -59,9 +62,10 @@ async def grab_klines(db_name: str):
             dt = dt1
             while dt <= dt2:
                 async with semaphore:
-                    edt = min(dt2, dt+INTERVAL_MAPPING[freq])
+                    edt = dt + INTERVAL_MAPPING[freq]*500
+                    edt = min(dt2, edt)
                     logger.info(
-                        f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} from {dt} to{edt} "
+                        f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} from {dt} to {edt} "
                     )
                     df = await conn.fetch_klines(sym_base, sym_quote, freq, dt, edt)
                     await conn.upsert_df(df, f"bar_{freq}", ["datetime", "symbol"])
@@ -114,13 +118,10 @@ async def run_websockets():
             and vol > tgt_vol
         )
         if res:
-            voice_alert(
-                f"current price is greater then previous price by {threshold_pct}%"
-            )
+            logger.info(f"current price is greater then previous price by {threshold_pct}%")
             raise KeyboardInterrupt()
         return res
 
-    socket = BNCWebSockets()
     pair = "bnbusdt"
     interval = "1h"
     channel = f"{pair}@kline_{interval}"
@@ -133,8 +134,7 @@ async def run_websockets():
 @click.option("--funcname", prompt="please enter function name you wanna run")
 def main(funcname: str):
     if funcname == "grab_trades":
-        db_name = "hist_data"
-        configs = config_manager.get_kline_config(db_name)
+        configs = config_manager.get_kline_config(DB_NAME)
         for conf in configs:
             sdt = conf["sdt"]
             edt = conf["edt"] if conf.get("edt") else datetime.now()

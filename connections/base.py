@@ -3,12 +3,11 @@ import requests
 from loggers import LOGGER
 from mongo_utils import AsyncMongoManager, MongoManager
 import pandas as pd
-from consts import EXCH, SYM, SYM_QUOTE, AIO_PROXIES
+from consts import EXCH, SYM, SYM_QUOTE, AIO_PROXIES, DB_NAME
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncIterator
 from websockets.client import WebSocketClientProtocol, connect
 from aiohttp import ClientSession
-from asyncio import Semaphore
 
 logger = LOGGER
 
@@ -20,7 +19,7 @@ class AsyncBaseConnection:
     def __init__(
         self,
         sess: ClientSession,
-        db_name: str = "hist_data",
+        db_name: str = DB_NAME,
     ) -> None:
         self.session = sess
         self.db_manager = AsyncMongoManager(db_name)
@@ -33,10 +32,12 @@ class AsyncBaseConnection:
         raise NotImplementedError()
 
     async def get(self, endpoint:str, **kwargs):
-        ret = await self.session.get(self.URL+endpoint, params=kwargs)
+        endpoint = self.URL+endpoint+"?"+"&".join([f"{key}={kwargs[key]}" for key in kwargs])
         logger.info(f"Sending get request to {endpoint} with params={kwargs}")
-        data = await ret.json()
-        return data
+        async with self.session.get(endpoint, proxy=AIO_PROXIES) as ret:
+            data = await ret.json()
+            logger.info(data)
+            return data
 
 
 class BaseConnection:
@@ -44,7 +45,7 @@ class BaseConnection:
     URL = ""
     EXCHANGE = ""
 
-    def __init__(self, db_name="hist_data"):
+    def __init__(self, db_name=DB_NAME):
         self.db_manager = MongoManager(db_name)
 
     @abstractmethod

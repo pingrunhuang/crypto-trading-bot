@@ -3,6 +3,7 @@ from pymongo import MongoClient, UpdateOne
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
 from loggers import LOGGER
+from consts import DB_NAME
 
 
 logger = LOGGER
@@ -11,7 +12,7 @@ logger = LOGGER
 class BaseMongoManager:
 
     SETTING_PATH = "./credentials.yaml"
-    DEFAULT_DB = "hist_data"
+    DEFAULT_DB = DB_NAME
 
     def __init__(self, db_name: Optional[str]) -> None:
         with open(self.SETTING_PATH, mode="r") as f:
