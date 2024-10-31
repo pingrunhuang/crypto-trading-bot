@@ -2,10 +2,10 @@ import yaml
 from pymongo import MongoClient, UpdateOne
 from motor.motor_asyncio import AsyncIOMotorClient
 from typing import Optional
-import logging
+from loggers import LOGGER
 
 
-logger = logging.getLogger("main")
+logger = LOGGER
 
 
 class BaseMongoManager:

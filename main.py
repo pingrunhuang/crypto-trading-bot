@@ -1,22 +1,20 @@
 import asyncio
-import temp
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import click
-import loggers
-import logging
+from connections import async_connections, connections
+from loggers import LOGGER
 from config_managers import ConfigManager
-import eastmoney
-from eastmoney.trades_processer import trades2mongo
-from eastmoney.funds2mongo import funds2mongo
+from connections import eastmoney
+from connections.base import AsyncBaseConnection
+from connections.eastmoney.trades_processer import trades2mongo
+from connections.eastmoney.funds2mongo import funds2mongo
 import aiohttp
 from alerts import voice_alert
+from consts import INTERVAL_MAPPING
 
-
-logger = logging.getLogger("main")
-
+logger = LOGGER
 
 config_manager = ConfigManager()
-
 
 async def grab_daily_trades(
     sym_base: str, sym_quote: str, exch: str, db_name: str, dt1: datetime, dt2: datetime
@@ -25,7 +23,7 @@ async def grab_daily_trades(
     session = aiohttp.ClientSession(
         connector=aiohttp.TCPConnector(limit=MAX_CONNECTIONS, ttl_dns_cache=300)
     )
-    con = temp.historical_downloaders[exch](session, db_name)
+    con = async_connections[exch](session, db_name)
     futures = []
     semaphore = asyncio.Semaphore(MAX_CONNECTIONS)
 
@@ -44,47 +42,48 @@ async def grab_daily_trades(
 
 async def grab_klines(db_name: str):
     MAX_CONNECTIONS = 10
-    session = aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=MAX_CONNECTIONS, ttl_dns_cache=300)
-    )
-    futures = []
-    semaphore = asyncio.Semaphore(MAX_CONNECTIONS)
+    async with aiohttp.ClientSession(trust_env=True) as session:
+        futures = []
+        semaphore = asyncio.Semaphore(MAX_CONNECTIONS)
 
-    async def _grab_klines(
-        sym_base: str,
-        sym_quote: str,
-        freq: str,
-        exch: str,
-        dt1: datetime,
-        dt2: datetime,
-    ):
+        async def _grab_klines(
+                conn: AsyncBaseConnection,
+                sym_base: str,
+                sym_quote: str,
+                freq: str,
+                exch: str,
+                dt1: datetime,
+                dt2: datetime,
+        ):
+            logger.info(f"Start grabbing {freq} bar data of {sym_base}{sym_quote}.{exch} from {dt1} to {dt2}")
+            dt = dt1
+            while dt <= dt2:
+                async with semaphore:
+                    edt = min(dt2, dt+INTERVAL_MAPPING[freq])
+                    logger.info(
+                        f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} from {dt} to{edt} "
+                    )
+                    df = await conn.fetch_klines(sym_base, sym_quote, freq, dt, edt)
+                    await conn.upsert_df(df, f"bar_{freq}", ["datetime", "symbol"])
+                    dt += (INTERVAL_MAPPING[freq]*500)
 
-        while dt1 <= dt2:
-            async with semaphore:
-                logger.info(
-                    f"Fetching {freq} klines of {sym_base}{sym_quote}.{exch} at {dt1}"
-                )
-                df = await downloader.fetch_spot_klines(sym_base, sym_quote, freq, dt1)
-                await downloader.upsert_df(df, f"bar_{freq}", ["datetime", "symbol"])
-                dt1 += timedelta(days=1)
+        configs = config_manager.get_kline_config(db_name)
+        logger.info(f"Grabbing klines using configs: {configs}")
+        for conf in configs:
+            sdt = conf["sdt"].replace(tzinfo=None)
+            edt = conf["edt"] if conf.get("edt") else datetime.now(timezone.utc)
+            edt = edt.replace(tzinfo=None)
+            exch = conf["exch"]
+            conn_manager = connections[exch]()
+            symbols_map = conn_manager.get_symbol_maps()
+            conn = async_connections[exch](session, db_name)
 
-    configs = config_manager.get_kline_config(db_name)
-
-    logger.info(f"configs: {configs}")
-    for conf in configs:
-        sdt = conf["sdt"]
-        edt = conf["edt"] if conf.get("edt") else datetime.utcnow()
-        exch = conf["exch"]
-        conn_manager = temp.conns[exch]()
-        symbols_map = conn_manager.get_symbol_maps()
-        downloader = temp.historical_downloaders[exch](session, db_name)
-
-        for sym in conf["symbols"]:
-            sym_quote = symbols_map[f"{sym}.{exch}"]
-            sym_base = sym[: len(sym) - len(f"{sym_quote}")]
-            for freq in conf["freq"]:
-                futures.append(_grab_klines(sym_base, sym_quote, freq, exch, sdt, edt))
-    await asyncio.gather(*futures)
+            for sym in conf["symbols"]:
+                sym_quote = symbols_map[f"{sym}.{exch}"]
+                sym_base = sym[: len(sym) - len(f"{sym_quote}")]
+                freq = conf["freq"]
+                futures.append(_grab_klines(conn, sym_base, sym_quote, freq, exch, sdt, edt))
+        await asyncio.gather(*futures)
 
 
 async def eastmoney_kline(db_name: str):
@@ -100,7 +99,7 @@ async def eastmoney_kline(db_name: str):
 
 
 def upsert_symbols(exch: str):
-    conn = temp.conns[exch]()
+    conn = connections[exch]()
     conn.upsert_symbols()
 
 
@@ -121,7 +120,7 @@ async def run_websockets():
             raise KeyboardInterrupt()
         return res
 
-    socket = temp.BNCWebSockets()
+    socket = BNCWebSockets()
     pair = "bnbusdt"
     interval = "1h"
     channel = f"{pair}@kline_{interval}"
@@ -138,9 +137,9 @@ def main(funcname: str):
         configs = config_manager.get_kline_config(db_name)
         for conf in configs:
             sdt = conf["sdt"]
-            edt = conf["edt"] if conf.get("edt") else datetime.utcnow()
+            edt = conf["edt"] if conf.get("edt") else datetime.now()
             exch = conf["exch"]
-            conn_manager = temp.conns[exch]()
+            conn_manager = connections[exch]()
             symbols_map = conn_manager.get_symbol_maps()
             for sym in conf["symbols"]:
                 sym_quote = symbols_map[f"{sym}.{exch}"]
@@ -149,9 +148,9 @@ def main(funcname: str):
                     grab_daily_trades(sym_base, sym_quote, exch, db_name, sdt, edt)
                 )
     elif funcname == "grab_klines":
-        asyncio.run(grab_klines("hist_data"))
+        asyncio.run(grab_klines("history"))
     elif funcname == "upsert_symbols":
-        for exch in config_manager.get_symbol_config("hist_data"):
+        for exch in config_manager.get_symbol_config("history"):
             upsert_symbols(exch)
     elif funcname == "websockets":
         asyncio.run(run_websockets())

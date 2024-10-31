@@ -1,7 +1,9 @@
 from enum import Enum
+from datetime import timedelta
 
 # exchanges
 BINANCE = "BNC"
+OKEX = "OKX"
 NASDAQ = "NASDAQ"
 New_York_Stock_Exchange = "NYSE"
 HK_Stock_Exchange = "SEHK"
@@ -29,3 +31,16 @@ class ORDERTYPE(Enum):
     LIMIT = "LIMIT"
     MARKET = "MARKET"
     STOP_LOSS = "STOP_LOSS"
+
+PROXIES = {
+    "http": "127.0.0.1:7890",
+    "https": "127.0.0.1:7890"
+}
+AIO_PROXIES = "http://127.0.0.1:7890"
+
+INTERVAL_MAPPING = {
+    "1m": timedelta(seconds=60),
+    "1h": timedelta(hours=1),
+    "4h": timedelta(hours=4),
+    "1d": timedelta(days=1)
+}

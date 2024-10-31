@@ -1,8 +1,8 @@
 import logging  # this is crucial to have, otherwise this module will just be a placeholder
-from consts import BINANCE
-from connections.bnc import BNCConnecter, BNCDownloader, BNCWebSockets
+from consts import BINANCE, OKEX
+from connections.bnc import BNCConnecter, AsyncBNCConnecter
+from connections.okx import OKEXConnecter
 
-conns = {BINANCE: BNCConnecter}
-historical_downloaders = {BINANCE: BNCDownloader}
+connections = {BINANCE: BNCConnecter, OKEX: OKEXConnecter}
+async_connections = {BINANCE: AsyncBNCConnecter}
 
-ws = {BINANCE: BNCWebSockets}

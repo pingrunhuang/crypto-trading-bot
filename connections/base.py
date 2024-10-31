@@ -1,25 +1,26 @@
 from abc import abstractmethod
 import requests
-import logging
+from loggers import LOGGER
 from mongo_utils import AsyncMongoManager, MongoManager
 import pandas as pd
-from consts import EXCH, SYM, SYM_QUOTE
+from consts import EXCH, SYM, SYM_QUOTE, AIO_PROXIES
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncIterator
 from websockets.client import WebSocketClientProtocol, connect
 from aiohttp import ClientSession
 from asyncio import Semaphore
 
-logger = logging.getLogger(__name__)
+logger = LOGGER
 
+class AsyncBaseConnection:
 
-class ABCDownloader:
+    URL = ""
+    EXCHANGE = ""
 
     def __init__(
         self,
         sess: ClientSession,
         db_name: str = "hist_data",
-        semaphore: Optional[Semaphore] = None,
     ) -> None:
         self.session = sess
         self.db_manager = AsyncMongoManager(db_name)
@@ -28,9 +29,17 @@ class ABCDownloader:
         records = df.to_dict("records")
         logger.info(f"Inserting {len(records)} into {clc_name}")
         await self.db_manager.batch_upsert(records, clc_name, keys)
+    async def fetch_klines(self, sym_base, sym_quote, freq, sdt, edt):
+        raise NotImplementedError()
+
+    async def get(self, endpoint:str, **kwargs):
+        ret = await self.session.get(self.URL+endpoint, params=kwargs)
+        logger.info(f"Sending get request to {endpoint} with params={kwargs}")
+        data = await ret.json()
+        return data
 
 
-class ABCConnection:
+class BaseConnection:
 
     URL = ""
     EXCHANGE = ""
@@ -40,12 +49,13 @@ class ABCConnection:
 
     @abstractmethod
     def ohlcv(self):
-        pass
+        raise NotImplementedError("Please implement the ohlcv method")
 
     def get(self, endpoint: str, method: str = "GET", **kwargs) -> requests.Response:
         url = f"{self.URL}{endpoint}"
+        proxies = kwargs.pop("proxies")
         params = kwargs.get("params", [])
-        ret = requests.request(method, url, params=params)
+        ret = requests.request(method, url, params=params, proxies=proxies)
         if not ret.ok:
             ret.raise_for_status()
         return ret

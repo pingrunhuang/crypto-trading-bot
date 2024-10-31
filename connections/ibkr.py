@@ -2,15 +2,14 @@
 This is the connection to interactivebroker api
 """
 
-from base import ABCConnection
-from ..consts import New_York_Stock_Exchange
-import requests
+from base import BaseConnection
+from consts import New_York_Stock_Exchange
 import loggers
 
 logger = loggers.logging.getLogger("connections")
 
 
-class IBKRConnector(ABCConnection):
+class IBKRConnector(BaseConnection):
     URL = "https://localhost:5000/v1/api/"
     EXCHANGE = ""
 

@@ -1,9 +1,9 @@
 import yaml
 import os
-import logging
+from loggers import LOGGER
 from collections import defaultdict
 
-logger = logging.getLogger("main")
+logger = LOGGER
 
 class ConfigManager:
 
