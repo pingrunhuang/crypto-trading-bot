@@ -1,8 +1,6 @@
-- initial_price: 0.19304
-  pct_threshold: 0.1
-  amt_threshold: 0.003
-  pair: BTC-USDT
-  base_qty: 5000
-  proxy_host: 127.0.0.1
-  proxy_port: 7890
-  exchange: OKX
+initial_price: 69000
+pct_threshold: 0.000001
+pair: "BTC-USDT"
+qty: 0.0001
+exchange: OKX
+channels: ["trades_data"]

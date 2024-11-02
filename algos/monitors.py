@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 async def runner():
-    client = await AsyncClient.create(api_key="", api_secret="")
+    client = await AsyncClient.create(api_key="", api_secret="", https_proxy="http://127.0.0.1:7890")
     manager = BinanceSocketManager(client, user_timeout=60)
     kline_manager = manager.trade_socket("BTCUSDT")
 
