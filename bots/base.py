@@ -1,7 +1,15 @@
 import websocket
 from loggers import DEBUG_LOGGER as LOGGER
+import queue
+import time
 
-class BaseWebsocket:
+class ErrorHandlerMixin:
+    def __init__(self) -> None:
+        self.error_queue = queue.Queue()
+    def raise_error(self, err):
+        self.error_queue.put(err)
+
+class BaseWebsocket(ErrorHandlerMixin):
 
     URL = ""
     EXCHANGE = ""
@@ -11,6 +19,7 @@ class BaseWebsocket:
         self,
         **kwargs
     ) -> None:
+        super().__init__()
         websocket.enableTrace(True)
         channels = kwargs.pop("channels")
         assert channels is not None
@@ -30,12 +39,13 @@ class BaseWebsocket:
             on_ping=self.on_ping,
             on_pong=self.on_pong
         )
+        self.data_queue = queue.Queue()
 
     def on_message(self, ws, msg):
         raise NotImplementedError(msg)
     
     def on_error(self, ws, msg):
-        LOGGER.error(msg)
+        self.raise_error(msg)
 
     def on_open(self, ws):
         """
@@ -66,14 +76,12 @@ class BaseWebsocket:
         LOGGER.info(f"Sending {params}")
         self.ws_client.send(params)
 
-class BaseBot:
+class BaseBot(ErrorHandlerMixin):
     def __init__(self, *args, **kwargs) -> None:
+        super().__init__()
         for key in kwargs:
             setattr(self, key, kwargs[key])
-
-    def generate_signal(self, *args, **kwargs)->bool:
-        pass
+        self.socket = None
     
-    def place_order(self, *args, **kwargs):
-        pass
-
+    def run(self):
+        raise NotImplementedError()

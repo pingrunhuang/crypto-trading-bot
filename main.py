@@ -9,6 +9,12 @@ import click
 from loggers import LOGGER
 from config_managers import ConfigManager
 from bots import BOTS
+import os
+
+
+os.environ["http_proxy"] = "http://127.0.0.1:7890"
+os.environ["https_proxy"] = "http://127.0.0.1:7890"
+
 logger = LOGGER
 
 config_manager = ConfigManager()
