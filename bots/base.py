@@ -1,6 +1,5 @@
 import websocket
-from loggers import LOGGER
-import json
+from loggers import DEBUG_LOGGER as LOGGER
 
 class BaseWebsocket:
 

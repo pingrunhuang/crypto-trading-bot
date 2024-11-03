@@ -8,3 +8,4 @@ with open("loggings.yaml") as f:
         logging.config.dictConfig(config=configs)
 
 LOGGER = logging.getLogger("main")
+DEBUG_LOGGER = logging.getLogger("connections")

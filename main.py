@@ -16,7 +16,7 @@ config_manager = ConfigManager()
 @click.command()
 @click.option("--config_file", prompt="please enter config file name")
 def main(config_file: str):
-    logger.info(f"Running funcname={config_file}...")
+    logger.info(f"Running with config_file={config_file}...")
     config = config_manager.get_strategy_config(config_file)
     logger.info(f"Found config={config}")
     exch = config["exchange"]

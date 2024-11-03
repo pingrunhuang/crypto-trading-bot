@@ -4,6 +4,8 @@ formatters:
       format: "%(asctime)s|%(levelname)s|%(message)s"
   error:
       format: "%(levelname)s|<PID %(process)d:%(processName)s>|%(name)s.%(funcName)s(): %(message)s"
+  debug:
+      format: "%(levelname)s|<thread %(thread)d:%(threadName)s>|%(name)s.%(funcName)s(): %(message)s"
 
 handlers:
   console:
@@ -15,8 +17,8 @@ handlers:
     formatter: default
     level: DEBUG
     filename: app.log
-    maxBytes: 10240000
-    backupCount: 5
+    maxBytes: 102400
+    backupCount: 10
     encoding: utf-8
   error:
     class: logging.handlers.RotatingFileHandler
@@ -25,14 +27,18 @@ handlers:
     filename: error.log
     maxBytes: 1024
     backupCount: 10
+  debug:
+    class: logging.handlers.RotatingFileHandler
+    formatter: debug
+    level: DEBUG
+    filename: debug.log
+    maxBytes: 2048
+    backupCount: 10
 
 loggers:
   connections:
-    handlers: [console, file, error]
+    handlers: [debug, error]
     # even handlers already setup levels, this level is important to setup for logger level 
-    level: DEBUG
-  eastmoney:
-    handlers: [console, file, error]
     level: DEBUG
   main:
     handlers: [console, file, error]

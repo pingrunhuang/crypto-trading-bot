@@ -4,16 +4,30 @@ from loggers import LOGGER
 import pandas as pd
 import ssl
 from bots.base import BaseWebsocket, BaseBot
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from consts import OKEX
-from threading import Thread
 import time
 import queue
-import sys
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 
 
 logger = LOGGER
+
+
+
+@dataclass
+class Trade:
+    dt:     datetime
+    sz:     float
+    px:     float
+    side:   str
+
+    def __init__(self, **kwargs):
+        self.dt = datetime.fromtimestamp(int(kwargs['ts'])/1000)
+        self.sz = float(kwargs['sz'])
+        self.px = float(kwargs['px'])
+        self.side = kwargs['side']
 
 class OKEXBot(BaseBot):
     """
@@ -31,22 +45,26 @@ class OKEXBot(BaseBot):
     
     def generate_signal(self, *args, **kwargs) -> bool:
         try:
-            last_trade_dt = getattr(self.data_feed, "last_dt")
-            if last_trade_dt-self.dt>=timedelta(minutes=1):
-                raise ValueError(f"Stale time err: {self.data_feed.last_dt}>{self.dt}")
+            trade:Trade = self.data_feed.data_queue.get(block=False)
+            last_trade_dt = trade.dt
+            cur_price = trade.px
+            offset = timedelta(seconds=getattr(self,"stale_time(seconds)"))
+            if last_trade_dt-self.dt>=offset:
+                raise ValueError(f"Stale time err: {last_trade_dt}-{self.dt}>{offset}")
             else:
                 self.dt = last_trade_dt
-                cur_price = float(self.data_feed.prx)
                 pct_change = (cur_price-self.cur_prx)/self.cur_prx
                 
                 if pct_change > float(self.pct_threshold):
                     self.cur_prx = cur_price
-                    logger.info(f"Selling {self.qty}")
+                    logger.info(f"Selling {self.qty} {self.pair}: {trade}")
                 elif pct_change < -float(self.pct_threshold):
                     self.cur_prx = cur_price
-                    logger.info(f"Buying {self.qty}")
+                    logger.info(f"Buying {self.qty} {self.pair}: {trade}")
                 else:
                     logger.info(f"{pct_change}, {self.pct_threshold}")
+        except queue.Empty:
+            return
         except Exception as e:
             raise e
         finally:
@@ -54,13 +72,14 @@ class OKEXBot(BaseBot):
 
     def run(self):
         with ThreadPoolExecutor(max_workers=4) as executor:
-            executor.submit(self.data_feed.start)
-            while True:
-                f2 = executor.submit(self.generate_signal)
-                try:
+            try:
+                executor.submit(self.data_feed.start)
+                while True:
+                    f2 = executor.submit(self.generate_signal)
                     result = f2.result()
-                except Exception as e:
-                    logger.error(e)
+                    # the signal that used for placing order
+            except Exception as e:
+                logger.error(e)
 
     def save(self):
         df = pd.DataFrame(self.orders)
@@ -84,6 +103,7 @@ class OKEXSocket(BaseWebsocket):
         **kwargs
     ) -> None:
         super().__init__(**kwargs)
+        self.data_queue = queue.Queue()
 
     def on_message(self, ws, msg):
         logger.info(f"{self.URL}: {msg}")
@@ -92,11 +112,7 @@ class OKEXSocket(BaseWebsocket):
             logger.warning(data)
         else:
             latest = data[0]
-            self.last_dt = datetime.fromtimestamp(int(latest['ts'])/1000)
-            self.prx = latest["px"]
-            self.size = latest["sz"]
-            self.side = latest["side"]
-
+            self.data_queue.put(Trade(**latest))
 
     def get_request_params(self, t:str):
         match t:

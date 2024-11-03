@@ -4,3 +4,4 @@ pair: "BTC-USDT"
 qty: 0.0001
 exchange: OKX
 channels: ["trades_data"]
+stale_time(seconds): 2
